@@ -5,17 +5,35 @@ using ITensorMPS
 using LinearAlgebra
 
 @testset "PseudoSite Algorithm Tests" begin
-    
+        
     @testset "PseudoSite Construction" begin
         n_modes = 2
         max_occ = 7
         alg = PseudoSite(n_modes, max_occ)
-        sites = create_qubit_sites(alg)
         @test alg.n_modes == n_modes
-        @test Mabs.n_qubits_per_mode(alg) == 3
+        @test n_qubits_per_mode(alg) == 3
         @test alg.fock_cutoff == max_occ
-        @test length(sites) == n_modes * 3
         @test_throws ArgumentError PseudoSite(1, 10)
+    end
+
+    @testset "PseudoSite Construction from Sites" begin
+        custom_sites = [ITensors.Index(2, "MyQubit,n=$i") for i in 1:6]
+        
+        alg = PseudoSite(custom_sites, 7)
+        
+        @test alg.n_modes == 2
+        @test alg.fock_cutoff == 7
+        @test n_qubits_per_mode(alg) == 3
+        
+        bad_sites = [ITensors.Index(2, "Q,n=$i") for i in 1:5]
+        @test_throws ArgumentError PseudoSite(bad_sites, 7)
+        
+        bad_sites2 = [ITensors.Index(3, "Q,n=$i") for i in 1:6]
+        @test_throws ArgumentError PseudoSite(bad_sites2, 7)
+        
+        psi = random_bmps(custom_sites, alg)
+        @test psi isa BMPS{<:ITensorMPS.MPS,<:PseudoSite}
+        @test length(psi) == 6
     end
 
     @testset "Binary Conversion" begin

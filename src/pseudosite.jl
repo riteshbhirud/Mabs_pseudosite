@@ -10,18 +10,79 @@ Fields:
 
 The quantics mapping represents occupation number states in binary:
 |n⟩ → |b_{N-1}⟩⊗|b_{N-2}⟩⊗...⊗|b_0⟩ where n = Σᵢ bᵢ × 2^i
+
+# Constructors
+
+## PseudoSite(n_modes::Int, fock_cutoff::Int)
+Create algorithm by specifying number of modes and Fock space cutoff.
+Use with `create_qubit_sites(alg)` to generate standard qubit indices.
+
+## PseudoSite(sites::Vector{ITensors.Index}, fock_cutoff::Int)
+Create algorithm from user-provided qubit sites.
+Number of modes is automatically inferred from site count.
+
+# Examples
+
+    # Option 1: Standard usage (let Mabs create sites)
+    alg = PseudoSite(2, 7)
+    sites = create_qubit_sites(alg)
+    psi = random_bmps(sites, alg)
+
+    # Option 2: Custom sites (user provides sites)
+    my_sites = [ITensors.Index(2, "Q,n=\$i") for i in 1:6]
+    alg = PseudoSite(my_sites, 7)  # 2 modes inferred
+    psi = random_bmps(my_sites, alg)
 """
 struct PseudoSite <: MabsAlg 
     n_modes::Int
     fock_cutoff::Int
     
     function PseudoSite(n_modes::Int, fock_cutoff::Int)
-        # Verify fock_cutoff is of form 2^N - 1
         N = log2(fock_cutoff + 1)
         isinteger(N) || throw(ArgumentError(PSEUDOSITE_ERROR))
         
         return new(n_modes, fock_cutoff)
     end
+end
+
+"""
+    PseudoSite(sites::Vector{ITensors.Index}, fock_cutoff::Int)
+
+Create PseudoSite algorithm from user-provided qubit sites.
+The number of modes is inferred from: n_modes = length(sites) / log₂(fock_cutoff + 1)
+
+Arguments:
+- sites::Vector{ITensors.Index}: User-provided qubit site indices
+- fock_cutoff::Int: Maximum occupation number (must be 2^N - 1)
+
+Returns:
+- PseudoSite: Algorithm specification with inferred n_modes
+
+# Example
+
+    # Create custom sites
+    sites = [ITensors.Index(2, "MyQubit,n=\$i") for i in 1:6]
+    alg = PseudoSite(sites, 7)  # 2 modes (6 sites / 3 qubits per mode)
+"""
+function PseudoSite(sites::Vector{<:ITensors.Index}, fock_cutoff::Int)
+    N = log2(fock_cutoff + 1)
+    isinteger(N) || throw(ArgumentError(PSEUDOSITE_ERROR))
+    n_qubits_per_mode = Int(N)
+    
+    length(sites) % n_qubits_per_mode == 0 || 
+        throw(ArgumentError(
+            "Number of sites ($(length(sites))) not divisible by n_qubits_per_mode ($n_qubits_per_mode). " *
+            "Expected length to be a multiple of $n_qubits_per_mode for fock_cutoff=$fock_cutoff."
+        ))
+    
+    n_modes = div(length(sites), n_qubits_per_mode)
+    
+    for (i, site) in enumerate(sites)
+        ITensors.dim(site) == 2 || 
+            throw(ArgumentError("Site $i has dimension $(ITensors.dim(site)), expected 2 (qubit)"))
+    end
+    
+    return PseudoSite(n_modes, fock_cutoff)
 end
 
 """

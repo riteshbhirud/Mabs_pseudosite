@@ -64,16 +64,11 @@ Base.getindex(bmpo::BMPO, i) = bmpo.mpo[i]
 Base.setindex!(bmpo::BMPO, val, i) = (bmpo.mpo[i] = val)
 Base.firstindex(bmpo::BMPO) = Base.firstindex(bmpo.mpo)
 Base.lastindex(bmpo::BMPO) = Base.lastindex(bmpo.mpo)
-
 for f in [
     :(ITensorMPS.findsite),
     :(ITensorMPS.findsites),
     :(ITensorMPS.firstsiteinds),
     :(ITensorMPS.expect),
-    :(ITensorMPS.inner),
-    :(LinearAlgebra.dot),
-    :(ITensorMPS.loginner),
-    :(ITensorMPS.logdot),
     :(LinearAlgebra.norm),
     :(ITensorMPS.lognorm),
     :(Base.collect),
@@ -93,195 +88,80 @@ for f in [
     @eval ($f)(bmpo::BMPO{<:ITensorMPS.MPO,Truncated}) = BMPO(($f)(bmpo.mpo), bmpo.alg)
 end
 
-"""
-    truncate(bmpo::BMPO{<:ITensorMPS.MPO,Truncated}; kwargs...)
-
-Create a truncated copy of the `BMPO`.
-
-Arguments:
-- bmpo::BMPO: Input bosonic MPO
-
-Keyword Arguments:
-- kwargs...: Truncation parameters passed to `ITensorMPS.truncate`
-  (e.g., `maxdim`, `cutoff`, `alg`)
-
-Returns:
-- BMPO: Truncated bosonic MPO
-"""
-function ITensorMPS.truncate(bmpo::BMPO{<:ITensorMPS.MPO,Truncated}; kwargs...)
+function ITensorMPS.truncate(bmpo::BMPO{<:ITensorMPS.MPO,<:MabsAlg}; kwargs...)
     truncated_mpo = ITensorMPS.truncate(bmpo.mpo; kwargs...)
     return BMPO(truncated_mpo, bmpo.alg)
 end
 
-"""
-    truncate!(bmpo::BMPO{<:ITensorMPS.MPO,Truncated}; kwargs...)
-
-Truncate the `BMPO` in place.
-
-Arguments:
-- bmpo::BMPO: Bosonic MPO to truncate
-
-Keyword Arguments:
-- kwargs...: Truncation parameters passed to ITensorMPS.truncate!
-  (e.g., `maxdim`, `cutoff`, `alg`)
-
-Returns:
-- BMPO: The truncated BMPO (same object, modified in place)
-"""
-function ITensorMPS.truncate!(bmpo::BMPO{<:ITensorMPS.MPO,Truncated}; kwargs...)
+function ITensorMPS.truncate!(bmpo::BMPO{<:ITensorMPS.MPO,<:MabsAlg}; kwargs...)
     ITensorMPS.truncate!(bmpo.mpo; kwargs...)
     return bmpo
 end
 
-"""
-    +(bmpo1::BMPO{<:ITensorMPS.MPO,Truncated}, bmpo2::BMPO{<:ITensorMPS.MPO,Truncated}; kwargs...)
-
-Add two `BMPO` objects with optional truncation. Also can be called with `add`.
-
-Arguments:
-- bmpo1::BMPO: First bosonic MPO
-- bmpo2::BMPO: Second bosonic MPO
-
-Keyword Arguments:
-- kwargs...: Truncation parameters passed to ITensorMPS.truncate
-  (e.g., `maxdim`, `cutoff`, `alg`)
-
-Returns:
-- BMPO: Sum of the two bosonic MPO
-"""
 function Base.:(+)(
-    bmpo1::BMPO{<:ITensorMPS.MPO,Truncated}, 
-    bmpo2::BMPO{<:ITensorMPS.MPO,Truncated}; 
+    bmpo1::BMPO{<:ITensorMPS.MPO,<:MabsAlg}, 
+    bmpo2::BMPO{<:ITensorMPS.MPO,<:MabsAlg}; 
     kwargs...
 )
+    bmpo1.alg == bmpo2.alg || throw(ArgumentError("Algorithms must match"))
     return ITensorMPS.add(bmpo1, bmpo2; kwargs...)
 end
+
 function ITensorMPS.add(
-    bmpo1::BMPO{<:ITensorMPS.MPO,Truncated}, 
-    bmpo2::BMPO{<:ITensorMPS.MPO,Truncated}; 
+    bmpo1::BMPO{<:ITensorMPS.MPO,<:MabsAlg}, 
+    bmpo2::BMPO{<:ITensorMPS.MPO,<:MabsAlg}; 
     kwargs...
 )
+    bmpo1.alg == bmpo2.alg || throw(ArgumentError("Algorithms must match"))
     result_mpo = ITensorMPS.add(bmpo1.mpo, bmpo2.mpo; kwargs...)
     return BMPO(result_mpo, bmpo1.alg)
 end
 
-"""
-    contract(bmpo::BMPO{<:ITensorMPS.MPO,Truncated}, bmps::BMPS{<:ITensorMPS.MPS,Truncated}; kwargs...)
-
-Contract a `BMPO` with a `BMPS` with optional truncation control.
-
-Arguments:
-- bmpo::BMPO: Bosonic MPO
-- bmps::BMPS: Bosonic MPS
-
-Keyword Arguments:
-- kwargs...: Contraction and truncation parameters passed to `ITensors.contract`
-  (e.g., `maxdim`, `cutoff`, `alg`)
-
-Returns:
-- BMPS: Result of MPO-MPS contraction
-"""
 function ITensors.contract(
-    bmpo::BMPO{<:ITensorMPS.MPO,Truncated}, 
-    bmps::BMPS{<:ITensorMPS.MPS,Truncated}; 
+    bmpo::BMPO{<:ITensorMPS.MPO,<:MabsAlg}, 
+    bmps::BMPS{<:ITensorMPS.MPS,<:MabsAlg}; 
     kwargs...
 )
+    bmpo.alg == bmps.alg || throw(ArgumentError("Algorithms must match"))
     result_mps = ITensors.contract(bmpo.mpo, bmps.mps; kwargs...)
     return BMPS(result_mps, bmps.alg)
 end
 
-"""
-    apply(bmpo::BMPO{<:ITensorMPS.MPO,Truncated}, bmps::BMPS{<:ITensorMPS.MPS,Truncated}; kwargs...)
-
-Apply a `BMPO` to a `BMPS` with optional truncation control.
-
-Arguments:
-- bmpo::BMPO: Bosonic MPO to apply
-- bmps::BMPS: Bosonic MPS to apply to
-
-Keyword Arguments:
-- kwargs...: Parameters passed to `ITensors.apply`
-  (e.g., `maxdim`, `cutoff`, `alg`)
-
-Returns:
-- BMPS: Result of applying MPO to MPS
-"""
 function ITensors.apply(
-    bmpo::BMPO{<:ITensorMPS.MPO,Truncated}, 
-    bmps::BMPS{<:ITensorMPS.MPS,Truncated}; 
+    bmpo::BMPO{<:ITensorMPS.MPO,<:MabsAlg}, 
+    bmps::BMPS{<:ITensorMPS.MPS,<:MabsAlg}; 
     kwargs...
 )
+    bmpo.alg == bmps.alg || throw(ArgumentError("Algorithms must match"))
     result_mps = ITensors.apply(bmpo.mpo, bmps.mps; kwargs...)
     return BMPS(result_mps, bmps.alg)
 end
 
-"""
-    outer(bmpo1::BMPS{<:ITensorMPS.MPO,Truncated}, bmpo2::BMPS{<:ITensorMPS.MPO,Truncated}; kwargs...)
-
-Compute outer product of two `BMPO` objects.
-
-Arguments:
-- bmpo1::BMPO: First bosonic MPO
-- bmpo2::BMPO: Second bosonic MPO
-
-Keyword Arguments:
-- kwargs...: Additional parameters passed to `ITensorMPS.outer`
-
-Returns:
-- BMPO: Outer product result as a bosonic MPO
-"""
 function ITensorMPS.outer(
-    bmpo1::BMPO{<:ITensorMPS.MPO,Truncated}, 
-    bmpo2::BMPO{<:ITensorMPS.MPO,Truncated}; 
+    bmpo1::BMPO{<:ITensorMPS.MPO,<:MabsAlg}, 
+    bmpo2::BMPO{<:ITensorMPS.MPO,<:MabsAlg}; 
     kwargs...
 )
+    bmpo1.alg == bmpo2.alg || throw(ArgumentError("Algorithms must match"))
     outer_result = ITensorMPS.outer(bmpo1.mpo, bmpo2.mpo; kwargs...)
     return BMPO(outer_result, bmpo1.alg)
 end
 
-"""
-    dot(bmpo1::BMPO{<:ITensorMPS.MPO,Truncated}, bmpo2::BMPO{<:ITensorMPS.MPO,Truncated}; kwargs...)
-
-Compute dot product of two `BMPO` objects.
-
-Arguments:
-- bmpo1::BMPO: First bosonic MPO
-- bmpo2::BMPO: Second bosonic MPO
-
-Keyword Arguments:
-- kwargs...: Additional parameters passed to `LinearAlgebra.dot`
-
-Returns:
-- Scalar
-"""
 function LinearAlgebra.dot(
-    bmpo1::BMPS{<:ITensorMPS.MPO,Truncated}, 
-    bmpo2::BMPS{<:ITensorMPS.MPO,Truncated}; 
+    bmpo1::BMPO{<:ITensorMPS.MPO,<:MabsAlg}, 
+    bmpo2::BMPO{<:ITensorMPS.MPO,<:MabsAlg}; 
     kwargs...
 )
+    bmpo1.alg == bmpo2.alg || throw(ArgumentError("Algorithms must match"))
     return LinearAlgebra.dot(bmpo1.mpo, bmpo2.mpo; kwargs...)
 end
 
-"""
-    inner(bmpo1::BMPO{<:ITensorMPS.MPO,Truncated}, bmpo2::BMPO{<:ITensorMPS.MPO,Truncated}; kwargs...)
-
-Compute inner product of two `BMPO` objects.
-
-Arguments:
-- bmpo1::BMPO: First bosonic MPO
-- bmpo2::BMPO: Second bosonic MPO
-
-Keyword Arguments:
-- kwargs...: Additional parameters passed to `ITensorMPS.inner`
-
-Returns:
-- Scalar
-"""
 function ITensorMPS.inner(
-    bmpo1::BMPO{<:ITensorMPS.MPO,Truncated}, 
-    bmpo2::BMPO{<:ITensorMPS.MPO,Truncated}; 
+    bmpo1::BMPO{<:ITensorMPS.MPO,<:MabsAlg}, 
+    bmpo2::BMPO{<:ITensorMPS.MPO,<:MabsAlg}; 
     kwargs...
 )
+    bmpo1.alg == bmpo2.alg || throw(ArgumentError("Algorithms must match"))
     return ITensorMPS.inner(bmpo1.mpo, bmpo2.mpo; kwargs...)
 end
 
@@ -351,16 +231,11 @@ function _convert_opsum_to_quantics(opsum::ITensors.OpSum, alg::PseudoSite)
     
     return quantics_opsum
 end
-
 for f in [
     :(ITensorMPS.findsite),
     :(ITensorMPS.findsites),
     :(ITensorMPS.firstsiteinds),
     :(ITensorMPS.expect),
-    :(ITensorMPS.inner),
-    :(LinearAlgebra.dot),
-    :(ITensorMPS.loginner),
-    :(ITensorMPS.logdot),
     :(LinearAlgebra.norm),
     :(ITensorMPS.lognorm),
     :(Base.collect),
@@ -380,63 +255,4 @@ for f in [
     :(ITensors.dag)
 ]
     @eval ($f)(bmpo::BMPO{<:ITensorMPS.MPO,<:PseudoSite}) = BMPO(($f)(bmpo.mpo), bmpo.alg)
-end
-
-function ITensorMPS.truncate(bmpo::BMPO{<:ITensorMPS.MPO,<:PseudoSite}; kwargs...)
-    truncated_mpo = ITensorMPS.truncate(bmpo.mpo; kwargs...)
-    return BMPO(truncated_mpo, bmpo.alg)
-end
-
-function ITensorMPS.truncate!(bmpo::BMPO{<:ITensorMPS.MPO,<:PseudoSite}; kwargs...)
-    ITensorMPS.truncate!(bmpo.mpo; kwargs...)
-    return bmpo
-end
-
-function Base.:(+)(
-    bmpo1::BMPO{<:ITensorMPS.MPO,<:PseudoSite}, 
-    bmpo2::BMPO{<:ITensorMPS.MPO,<:PseudoSite}; 
-    kwargs...
-)
-    bmpo1.alg == bmpo2.alg || throw(ArgumentError("PseudoSite algorithms must match"))
-    return ITensorMPS.add(bmpo1, bmpo2; kwargs...)
-end
-
-function ITensorMPS.add(
-    bmpo1::BMPO{<:ITensorMPS.MPO,<:PseudoSite}, 
-    bmpo2::BMPO{<:ITensorMPS.MPO,<:PseudoSite}; 
-    kwargs...
-)
-    bmpo1.alg == bmpo2.alg || throw(ArgumentError("PseudoSite algorithms must match"))
-    result_mpo = ITensorMPS.add(bmpo1.mpo, bmpo2.mpo; kwargs...)
-    return BMPO(result_mpo, bmpo1.alg)
-end
-
-function ITensors.contract(
-    bmpo::BMPO{<:ITensorMPS.MPO,<:PseudoSite}, 
-    bmps::BMPS{<:ITensorMPS.MPS,PseudoSite}; 
-    kwargs...
-)
-    bmpo.alg == bmps.alg || throw(ArgumentError("PseudoSite algorithms must match"))
-    result_mps = ITensors.contract(bmpo.mpo, bmps.mps; kwargs...)
-    return BMPS(result_mps, bmps.alg)
-end
-
-function ITensors.apply(
-    bmpo::BMPO{<:ITensorMPS.MPO,<:PseudoSite}, 
-    bmps::BMPS{<:ITensorMPS.MPS,PseudoSite}; 
-    kwargs...
-)
-    bmpo.alg == bmps.alg || throw(ArgumentError("PseudoSite algorithms must match"))
-    result_mps = ITensors.apply(bmpo.mpo, bmps.mps; kwargs...)
-    return BMPS(result_mps, bmps.alg)
-end
-
-function ITensorMPS.outer(
-    bmpo1::BMPO{<:ITensorMPS.MPO,<:PseudoSite}, 
-    bmpo2::BMPO{<:ITensorMPS.MPO,<:PseudoSite}; 
-    kwargs...
-)
-    bmpo1.alg == bmpo2.alg || throw(ArgumentError("PseudoSite algorithms must match"))
-    outer_result = ITensorMPS.outer(bmpo1.mpo, bmpo2.mpo; kwargs...)
-    return BMPO(outer_result, bmpo1.alg)
 end

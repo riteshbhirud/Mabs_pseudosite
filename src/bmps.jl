@@ -44,10 +44,6 @@ for f in [
     :(ITensorMPS.findsites),
     :(ITensorMPS.firstsiteinds),
     :(ITensorMPS.expect),
-    :(ITensorMPS.inner),
-    :(LinearAlgebra.dot),
-    :(ITensorMPS.loginner),
-    :(ITensorMPS.logdot),
     :(LinearAlgebra.norm),
     :(ITensorMPS.lognorm),
     :(Base.collect),
@@ -78,182 +74,79 @@ Base.setindex!(bmps::BMPS, val, i) = (bmps.mps[i] = val)
 Base.firstindex(bmps::BMPS) = Base.firstindex(bmps.mps)
 Base.lastindex(bmps::BMPS) = Base.lastindex(bmps.mps)
 
-"""
-    normalize[!](bmps::BMPS{<:ITensorMPS.MPS,Truncated}; (lognorm!)=[])
-
-Normalize the `BMPS` in place such that `norm(bmps) ≈ 1`.
-
-Arguments:
-- bmps::BMPS: Bosonic MPS to normalize
-
-Keyword Arguments:
-- lognorm!=[]: Mutable vector to store the log norm. Pass an empty vector 
-  that will be filled with the log norm value.
-
-Returns:
-- BMPS: The normalized BMPS (same object, modified in place)
-```
-"""
-function LinearAlgebra.normalize!(bmps::BMPS{<:ITensorMPS.MPS,Truncated}; kwargs...)
+function LinearAlgebra.normalize!(bmps::BMPS{<:ITensorMPS.MPS,<:MabsAlg}; kwargs...)
     LinearAlgebra.normalize!(bmps.mps; kwargs...)
     return bmps
 end
-function LinearAlgebra.normalize(bmps::BMPS{<:ITensorMPS.MPS,Truncated}; kwargs...)
+
+function LinearAlgebra.normalize(bmps::BMPS{<:ITensorMPS.MPS,<:MabsAlg}; kwargs...)
     normalized_mps = LinearAlgebra.normalize(bmps.mps; kwargs...)
     return BMPS(normalized_mps, bmps.alg)
 end
 
-"""
-    orthogonalize[!](bmps::BMPS{<:ITensorMPS.MPS,Truncated}, j::Int)
-
-Orthogonalize the `BMPS`` to site j.
-
-Arguments:
-- bmps::BMPS: Bosonic MPS to orthogonalize
-- j::Int: Site to orthogonalize to
-
-Returns:
-- BMPS: The orthogonalized BMPS (same object, modified in place)
-"""
-function ITensorMPS.orthogonalize!(
-    bmps::BMPS{<:ITensorMPS.MPS,Truncated}, 
-    j::Int; 
-    kwargs...
-)
+function ITensorMPS.orthogonalize!(bmps::BMPS{<:ITensorMPS.MPS,<:MabsAlg}, j::Int; kwargs...)
     ITensorMPS.orthogonalize!(bmps.mps, j; kwargs...)
     return bmps
 end
-function ITensorMPS.orthogonalize(
-    bmps::BMPS{<:ITensorMPS.MPS,Truncated}, 
-    j::Int; 
-    kwargs...
-)
+
+function ITensorMPS.orthogonalize(bmps::BMPS{<:ITensorMPS.MPS,<:MabsAlg}, j::Int; kwargs...)
     orthog_mps = ITensorMPS.orthogonalize(bmps.mps, j; kwargs...)
     return BMPS(orthog_mps, bmps.alg)
 end
 
-"""
-    truncate[!](bmps::BMPS{<:ITensorMPS.MPS,Truncated}; kwargs...)
-
-Create a truncated copy of the `BMPS`.
-
-Arguments:
-- bmps::BMPS: Input bosonic MPS
-
-Keyword Arguments:
-- kwargs...: Truncation parameters passed to `ITensorMPS.truncate` 
-  (e.g., `maxdim`, `cutoff`, `alg`)
-
-Returns:
-- BMPS: Truncated bosonic MPS
-"""
-function ITensorMPS.truncate(bmps::BMPS{<:ITensorMPS.MPS,Truncated}; kwargs...)
+function ITensorMPS.truncate(bmps::BMPS{<:ITensorMPS.MPS,<:MabsAlg}; kwargs...)
     truncated_mps = ITensorMPS.truncate(bmps.mps; kwargs...)
     return BMPS(truncated_mps, bmps.alg)
 end
-function ITensorMPS.truncate!(bmps::BMPS{<:ITensorMPS.MPS,Truncated}; kwargs...)
+
+function ITensorMPS.truncate!(bmps::BMPS{<:ITensorMPS.MPS,<:MabsAlg}; kwargs...)
     ITensorMPS.truncate!(bmps.mps; kwargs...)
     return bmps
 end
 
-"""
-    +(bmps1::BMPS{<:ITensorMPS.MPS,Truncated}, bmps2::BMPS{<:ITensorMPS.MPS,Truncated}; kwargs...)
-
-Add two BMPS objects with optional truncation. Can also use `add`.
-
-Arguments:
-- bmps1::BMPS: First bosonic MPS
-- bmps2::BMPS: Second bosonic MPS
-
-Keyword Arguments:
-- kwargs...: Truncation parameters passed to ITensorMPS.truncate (e.g., `maxdim`, `cutoff`)
-
-Returns:
-- BMPS: Sum of the two bosonic MPS
-"""
 function Base.:(+)(
-    bmps1::BMPS{<:ITensorMPS.MPS,Truncated}, 
-    bmps2::BMPS{<:ITensorMPS.MPS,Truncated}; 
+    bmps1::BMPS{<:ITensorMPS.MPS,<:MabsAlg}, 
+    bmps2::BMPS{<:ITensorMPS.MPS,<:MabsAlg}; 
     kwargs...
 )
+    bmps1.alg == bmps2.alg || throw(ArgumentError("Algorithms must match"))
     result_mps = Base.:(+)(bmps1.mps, bmps2.mps; kwargs...)
     return BMPS(result_mps, bmps1.alg)
 end
+
 function ITensorMPS.add(
-    bmps1::BMPS{<:ITensorMPS.MPS,Truncated}, 
-    bmps2::BMPS{<:ITensorMPS.MPS,Truncated}; 
+    bmps1::BMPS{<:ITensorMPS.MPS,<:MabsAlg}, 
+    bmps2::BMPS{<:ITensorMPS.MPS,<:MabsAlg}; 
     kwargs...
 )
     return Base.:(+)(bmps1, bmps2; kwargs...)
 end
 
-"""
-    outer(bmps1::BMPS{<:ITensorMPS.MPS,Truncated}, bmps2::BMPS{<:ITensorMPS.MPS,Truncated}; kwargs...)
-
-Compute outer product of two `BMPS` objects.
-
-Arguments:
-- bmps1::BMPS: First bosonic MPS
-- bmps2::BMPS: Second bosonic MPS
-
-Keyword Arguments:
-- kwargs...: Additional parameters passed to `ITensorMPS.outer`
-
-Returns:
-- BMPO: Outer product result as a bosonic MPO
-"""
 function ITensorMPS.outer(
-    bmps1::BMPS{<:ITensorMPS.MPS,Truncated}, 
-    bmps2::BMPS{<:ITensorMPS.MPS,Truncated}; 
+    bmps1::BMPS{<:ITensorMPS.MPS,<:MabsAlg}, 
+    bmps2::BMPS{<:ITensorMPS.MPS,<:MabsAlg}; 
     kwargs...
 )
+    bmps1.alg == bmps2.alg || throw(ArgumentError("Algorithms must match"))
     outer_result = ITensorMPS.outer(bmps1.mps, bmps2.mps; kwargs...)
     return BMPO(outer_result, bmps1.alg)
 end
 
-"""
-    dot(bmps1::BMPS{<:ITensorMPS.MPS,Truncated}, bmps2::BMPS{<:ITensorMPS.MPS,Truncated}; kwargs...)
-
-Compute dot product of two `BMPS` objects.
-
-Arguments:
-- bmps1::BMPS: First bosonic MPS
-- bmps2::BMPS: Second bosonic MPS
-
-Keyword Arguments:
-- kwargs...: Additional parameters passed to LinearAlgebra.dot
-
-Returns:
-- Scalar: Dot product ⟨bmps1|bmps2⟩
-"""
 function LinearAlgebra.dot(
-    bmps1::BMPS{<:ITensorMPS.MPS,Truncated}, 
-    bmps2::BMPS{<:ITensorMPS.MPS,Truncated}; 
+    bmps1::BMPS{<:ITensorMPS.MPS,<:MabsAlg}, 
+    bmps2::BMPS{<:ITensorMPS.MPS,<:MabsAlg}; 
     kwargs...
 )
+    bmps1.alg == bmps2.alg || throw(ArgumentError("Algorithms must match"))
     return LinearAlgebra.dot(bmps1.mps, bmps2.mps; kwargs...)
 end
 
-"""
-    inner(bmps1::BMPS{<:ITensorMPS.MPS,Truncated}, bmps2::BMPS{<:ITensorMPS.MPS,Truncated}; kwargs...)
-
-Compute inner product of two `BMPS` objects.
-
-Arguments:
-- bmps1::BMPS: First bosonic MPS
-- bmps2::BMPS: Second bosonic MPS
-
-Keyword Arguments:
-- kwargs...: Additional parameters passed to `ITensorMPS.inner`
-
-Returns:
-- Scalar: Inner product ⟨bmps1|bmps2⟩
-"""
 function ITensorMPS.inner(
-    bmps1::BMPS{<:ITensorMPS.MPS,Truncated}, 
-    bmps2::BMPS{<:ITensorMPS.MPS,Truncated}; 
+    bmps1::BMPS{<:ITensorMPS.MPS,<:MabsAlg}, 
+    bmps2::BMPS{<:ITensorMPS.MPS,<:MabsAlg}; 
     kwargs...
 )
+    bmps1.alg == bmps2.alg || throw(ArgumentError("Algorithms must match"))
     return ITensorMPS.inner(bmps1.mps, bmps2.mps; kwargs...)
 end
 
@@ -287,36 +180,26 @@ function BMPS(sites::Vector{<:ITensors.Index}, states::Vector, alg::PseudoSite)
     n_expected = alg.n_modes * n_qubits_per_mode(alg)
     length(sites) == n_expected || 
         throw(ArgumentError("Sites length $(length(sites)) must match expected $n_expected"))
-    
     length(states) == alg.n_modes || 
         throw(ArgumentError("Number of states $(length(states)) must match modes $(alg.n_modes))"))
-    
     n_qubits = n_qubits_per_mode(alg)
-    binary_states = Int[]
-    sizehint!(binary_states, n_expected)  # Pre-allocate
-    
+    binary_states = Vector{Int}(undef, n_expected) 
+    idx = 1
     for (mode_idx, n) in enumerate(states)
         n <= alg.fock_cutoff || 
             throw(ArgumentError("State $n exceeds maximum $(alg.fock_cutoff)"))
-        
-        binary_state = decimal_to_binary_state(n, n_qubits)
-        append!(binary_states, binary_state)
+        binary_state = Mabs.decimal_to_binary_state(n, n_qubits)
+        copyto!(binary_states, idx, binary_state, 1, n_qubits)
+        idx += n_qubits
     end
-    
     mps = ITensorMPS.productMPS(sites, binary_states)
-    
     return BMPS{typeof(mps), typeof(alg)}(mps, alg)
 end
-
 for f in [
     :(ITensorMPS.findsite),
     :(ITensorMPS.findsites),
     :(ITensorMPS.firstsiteinds),
     :(ITensorMPS.expect),
-    :(ITensorMPS.inner),
-    :(LinearAlgebra.dot),
-    :(ITensorMPS.loginner),
-    :(ITensorMPS.logdot),
     :(LinearAlgebra.norm),
     :(ITensorMPS.lognorm),
     :(Base.collect),
@@ -336,80 +219,4 @@ for f in [
     :(ITensors.dag)
 ]
     @eval ($f)(bmps::BMPS{<:ITensorMPS.MPS,<:PseudoSite}) = BMPS(($f)(bmps.mps), bmps.alg)
-end
-
-function LinearAlgebra.normalize!(bmps::BMPS{<:ITensorMPS.MPS,<:PseudoSite}; kwargs...)
-    LinearAlgebra.normalize!(bmps.mps; kwargs...)
-    return bmps
-end
-
-function LinearAlgebra.normalize(bmps::BMPS{<:ITensorMPS.MPS,<:PseudoSite}; kwargs...)
-    normalized_mps = LinearAlgebra.normalize(bmps.mps; kwargs...)
-    return BMPS(normalized_mps, bmps.alg)
-end
-
-function ITensorMPS.orthogonalize!(bmps::BMPS{<:ITensorMPS.MPS,<:PseudoSite}, j::Int; kwargs...)
-    ITensorMPS.orthogonalize!(bmps.mps, j; kwargs...)
-    return bmps
-end
-
-function ITensorMPS.orthogonalize(bmps::BMPS{<:ITensorMPS.MPS,<:PseudoSite}, j::Int; kwargs...)
-    orthog_mps = ITensorMPS.orthogonalize(bmps.mps, j; kwargs...)
-    return BMPS(orthog_mps, bmps.alg)
-end
-
-function ITensorMPS.truncate(bmps::BMPS{<:ITensorMPS.MPS,<:PseudoSite}; kwargs...)
-    truncated_mps = ITensorMPS.truncate(bmps.mps; kwargs...)
-    return BMPS(truncated_mps, bmps.alg)
-end
-
-function ITensorMPS.truncate!(bmps::BMPS{<:ITensorMPS.MPS,<:PseudoSite}; kwargs...)
-    ITensorMPS.truncate!(bmps.mps; kwargs...)
-    return bmps
-end
-
-function Base.:(+)(
-    bmps1::BMPS{<:ITensorMPS.MPS,<:PseudoSite}, 
-    bmps2::BMPS{<:ITensorMPS.MPS,<:PseudoSite}; 
-    kwargs...
-)
-    bmps1.alg == bmps2.alg || throw(ArgumentError("PseudoSite algorithms must match"))
-    result_mps = Base.:(+)(bmps1.mps, bmps2.mps; kwargs...)
-    return BMPS(result_mps, bmps1.alg)
-end
-
-function ITensorMPS.add(
-    bmps1::BMPS{<:ITensorMPS.MPS,<:PseudoSite}, 
-    bmps2::BMPS{<:ITensorMPS.MPS,<:PseudoSite}; 
-    kwargs...
-)
-    return Base.:(+)(bmps1, bmps2; kwargs...)
-end
-
-function ITensorMPS.outer(
-    bmps1::BMPS{<:ITensorMPS.MPS,<:PseudoSite}, 
-    bmps2::BMPS{<:ITensorMPS.MPS,<:PseudoSite}; 
-    kwargs...
-)
-    bmps1.alg == bmps2.alg || throw(ArgumentError("PseudoSite algorithms must match"))
-    outer_result = ITensorMPS.outer(bmps1.mps, bmps2.mps; kwargs...)
-    return BMPO(outer_result, bmps1.alg)
-end
-
-function LinearAlgebra.dot(
-    bmps1::BMPS{<:ITensorMPS.MPS,<:PseudoSite}, 
-    bmps2::BMPS{<:ITensorMPS.MPS,<:PseudoSite}; 
-    kwargs...
-)
-    bmps1.alg == bmps2.alg || throw(ArgumentError("PseudoSite algorithms must match"))
-    return LinearAlgebra.dot(bmps1.mps, bmps2.mps; kwargs...)
-end
-
-function ITensorMPS.inner(
-    bmps1::BMPS{<:ITensorMPS.MPS,<:PseudoSite}, 
-    bmps2::BMPS{<:ITensorMPS.MPS,<:PseudoSite}; 
-    kwargs...
-)
-    bmps1.alg == bmps2.alg || throw(ArgumentError("PseudoSite algorithms must match"))
-    return ITensorMPS.inner(bmps1.mps, bmps2.mps; kwargs...)
 end
