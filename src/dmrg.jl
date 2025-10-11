@@ -36,7 +36,7 @@ function dmrg(
     nsweeps::Int,
     kwargs...
 )
-    H.alg == psi0.alg || throw(ArgumentError("Algorithms must match"))
+    H.alg == psi0.alg || throw(ArgumentError(ALGORITHM_MISMATCH_ERROR))
     
     energy, converged_mps = ITensorMPS.dmrg(H.mpo, psi0.mps; nsweeps=nsweeps, kwargs...)
     return energy, BMPS(converged_mps, psi0.alg)

@@ -103,7 +103,7 @@ function Base.:(+)(
     bmpo2::BMPO{<:ITensorMPS.MPO,<:MabsAlg}; 
     kwargs...
 )
-    bmpo1.alg == bmpo2.alg || throw(ArgumentError("Algorithms must match"))
+    bmpo1.alg == bmpo2.alg || throw(ArgumentError(ALGORITHM_MISMATCH_ERROR))
     return ITensorMPS.add(bmpo1, bmpo2; kwargs...)
 end
 
@@ -112,7 +112,7 @@ function ITensorMPS.add(
     bmpo2::BMPO{<:ITensorMPS.MPO,<:MabsAlg}; 
     kwargs...
 )
-    bmpo1.alg == bmpo2.alg || throw(ArgumentError("Algorithms must match"))
+    bmpo1.alg == bmpo2.alg || throw(ArgumentError(ALGORITHM_MISMATCH_ERROR))
     result_mpo = ITensorMPS.add(bmpo1.mpo, bmpo2.mpo; kwargs...)
     return BMPO(result_mpo, bmpo1.alg)
 end
@@ -122,7 +122,7 @@ function ITensors.contract(
     bmps::BMPS{<:ITensorMPS.MPS,<:MabsAlg}; 
     kwargs...
 )
-    bmpo.alg == bmps.alg || throw(ArgumentError("Algorithms must match"))
+    bmpo.alg == bmps.alg || throw(ArgumentError(ALGORITHM_MISMATCH_ERROR))
     result_mps = ITensors.contract(bmpo.mpo, bmps.mps; kwargs...)
     return BMPS(result_mps, bmps.alg)
 end
@@ -132,7 +132,7 @@ function ITensors.apply(
     bmps::BMPS{<:ITensorMPS.MPS,<:MabsAlg}; 
     kwargs...
 )
-    bmpo.alg == bmps.alg || throw(ArgumentError("Algorithms must match"))
+    bmpo.alg == bmps.alg || throw(ArgumentError(ALGORITHM_MISMATCH_ERROR))
     result_mps = ITensors.apply(bmpo.mpo, bmps.mps; kwargs...)
     return BMPS(result_mps, bmps.alg)
 end
@@ -142,7 +142,7 @@ function ITensorMPS.outer(
     bmpo2::BMPO{<:ITensorMPS.MPO,<:MabsAlg}; 
     kwargs...
 )
-    bmpo1.alg == bmpo2.alg || throw(ArgumentError("Algorithms must match"))
+    bmpo1.alg == bmpo2.alg || throw(ArgumentError(ALGORITHM_MISMATCH_ERROR))
     outer_result = ITensorMPS.outer(bmpo1.mpo, bmpo2.mpo; kwargs...)
     return BMPO(outer_result, bmpo1.alg)
 end
@@ -152,7 +152,7 @@ function LinearAlgebra.dot(
     bmpo2::BMPO{<:ITensorMPS.MPO,<:MabsAlg}; 
     kwargs...
 )
-    bmpo1.alg == bmpo2.alg || throw(ArgumentError("Algorithms must match"))
+    bmpo1.alg == bmpo2.alg || throw(ArgumentError(ALGORITHM_MISMATCH_ERROR))
     return LinearAlgebra.dot(bmpo1.mpo, bmpo2.mpo; kwargs...)
 end
 
@@ -161,7 +161,7 @@ function ITensorMPS.inner(
     bmpo2::BMPO{<:ITensorMPS.MPO,<:MabsAlg}; 
     kwargs...
 )
-    bmpo1.alg == bmpo2.alg || throw(ArgumentError("Algorithms must match"))
+    bmpo1.alg == bmpo2.alg || throw(ArgumentError(ALGORITHM_MISMATCH_ERROR))
     return ITensorMPS.inner(bmpo1.mpo, bmpo2.mpo; kwargs...)
 end
 

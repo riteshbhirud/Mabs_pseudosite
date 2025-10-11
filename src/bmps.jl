@@ -109,7 +109,7 @@ function Base.:(+)(
     bmps2::BMPS{<:ITensorMPS.MPS,<:MabsAlg}; 
     kwargs...
 )
-    bmps1.alg == bmps2.alg || throw(ArgumentError("Algorithms must match"))
+    bmps1.alg == bmps2.alg || throw(ArgumentError(ALGORITHM_MISMATCH_ERROR))
     result_mps = Base.:(+)(bmps1.mps, bmps2.mps; kwargs...)
     return BMPS(result_mps, bmps1.alg)
 end
@@ -127,7 +127,7 @@ function ITensorMPS.outer(
     bmps2::BMPS{<:ITensorMPS.MPS,<:MabsAlg}; 
     kwargs...
 )
-    bmps1.alg == bmps2.alg || throw(ArgumentError("Algorithms must match"))
+    bmps1.alg == bmps2.alg || throw(ArgumentError(ALGORITHM_MISMATCH_ERROR))
     outer_result = ITensorMPS.outer(bmps1.mps, bmps2.mps; kwargs...)
     return BMPO(outer_result, bmps1.alg)
 end
@@ -137,7 +137,7 @@ function LinearAlgebra.dot(
     bmps2::BMPS{<:ITensorMPS.MPS,<:MabsAlg}; 
     kwargs...
 )
-    bmps1.alg == bmps2.alg || throw(ArgumentError("Algorithms must match"))
+    bmps1.alg == bmps2.alg || throw(ArgumentError(ALGORITHM_MISMATCH_ERROR))
     return LinearAlgebra.dot(bmps1.mps, bmps2.mps; kwargs...)
 end
 
@@ -146,7 +146,7 @@ function ITensorMPS.inner(
     bmps2::BMPS{<:ITensorMPS.MPS,<:MabsAlg}; 
     kwargs...
 )
-    bmps1.alg == bmps2.alg || throw(ArgumentError("Algorithms must match"))
+    bmps1.alg == bmps2.alg || throw(ArgumentError(ALGORITHM_MISMATCH_ERROR))
     return ITensorMPS.inner(bmps1.mps, bmps2.mps; kwargs...)
 end
 

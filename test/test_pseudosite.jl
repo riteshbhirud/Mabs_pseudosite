@@ -204,7 +204,7 @@ using LinearAlgebra
         psi = random_bmps(sites, alg; linkdims=2)
         ITensorMPS.normalize!(psi.mps)
         dt = 0.01
-        psi_evolved = Mabs.tdvp(psi, H, dt; cutoff=1e-8)
+        psi_evolved = Mabs.tdvp(psi, H, -1im * dt; cutoff=1e-8)
         @test psi_evolved isa BMPS{<:ITensorMPS.MPS,<:PseudoSite}
         @test psi_evolved !== psi
     end
@@ -341,7 +341,7 @@ using LinearAlgebra
         H_simple = harmonic_chain(sites, alg; ω=1.0, J=0.0)
         psi_simple = BMPS(sites, [1], alg)
         ITensorMPS.normalize!(psi_simple.mps)
-        psi_evolved = Mabs.tdvp(psi_simple, H_simple, 0.1; cutoff=1e-12)
+        psi_evolved = Mabs.tdvp(psi_simple, H_simple, -1im * 0.1; cutoff=1e-12)
         @test abs(ITensorMPS.norm(psi_evolved.mps) - 1.0) < 1e-6
         @test psi_evolved isa BMPS
     end

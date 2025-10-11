@@ -13,11 +13,11 @@ The quantics mapping represents occupation number states in binary:
 
 # Constructors
 
-## PseudoSite(n_modes::Int, fock_cutoff::Int)
+# PseudoSite(n_modes::Int, fock_cutoff::Int)
 Create algorithm by specifying number of modes and Fock space cutoff.
 Use with `create_qubit_sites(alg)` to generate standard qubit indices.
 
-## PseudoSite(sites::Vector{ITensors.Index}, fock_cutoff::Int)
+# PseudoSite(sites::Vector{ITensors.Index}, fock_cutoff::Int)
 Create algorithm from user-provided qubit sites.
 Number of modes is automatically inferred from site count.
 
