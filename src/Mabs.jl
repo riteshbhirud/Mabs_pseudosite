@@ -23,7 +23,6 @@ export create, destroy, number,
        add
 export n_qubits_per_mode, create_qubit_sites
 
-
 include("algs.jl")
 include("throws.jl")
 include("truncated.jl")

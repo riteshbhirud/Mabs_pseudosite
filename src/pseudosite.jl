@@ -124,7 +124,7 @@ function Base.:(==)(alg1::PseudoSite, alg2::PseudoSite)
 end
 
 """
-    get_mode_cluster(sites::Vector{<:ITensors.Index}, alg::PseudoSite, mode::Int)
+    _get_mode_cluster(sites::Vector{<:ITensors.Index}, alg::PseudoSite, mode::Int)
 
 Get the qubit cluster indices for a specific bosonic mode.
 
@@ -136,7 +136,7 @@ Arguments:
 Returns:
 - Vector{ITensors.Index}: Qubit sites for this mode
 """
-function get_mode_cluster(sites::Vector{<:ITensors.Index}, alg::PseudoSite, mode::Int)
+function _get_mode_cluster(sites::Vector{<:ITensors.Index}, alg::PseudoSite, mode::Int)
     (mode < 1 || mode > alg.n_modes) && 
         throw(ArgumentError("Mode $mode out of range [1, $(alg.n_modes)]"))
     
@@ -171,7 +171,7 @@ function get_mode_indices(alg::PseudoSite, mode::Int)
 end
 
 """
-    decimal_to_binary_state(n::Int, n_qubits::Int)
+    fock_to_qubit_state(n::Int, n_qubits::Int)
 
 Convert decimal occupation number to binary state vector.
 
@@ -182,7 +182,7 @@ Arguments:
 Returns:
 - Vector{Int}: Binary representation [b_0, b_1, ..., b_{N-1}] where bᵢ ∈ {1,2} (ITensor convention)
 """
-function decimal_to_binary_state(n::Int, n_qubits::Int)
+function fock_to_qubit_state(n::Int, n_qubits::Int)
     n >= 0 || throw(ArgumentError("Occupation number must be non-negative"))
     n < 2^n_qubits || throw(ArgumentError("Occupation $n exceeds max for $n_qubits qubits"))
     binary_state = Vector{Int}(undef, n_qubits)
@@ -194,7 +194,7 @@ function decimal_to_binary_state(n::Int, n_qubits::Int)
 end
 
 """
-    binary_state_to_decimal(binary_state::Vector{Int})
+    qubit_state_to_fock(binary_state::Vector{Int})
 
 Convert binary state vector to decimal occupation number.
 
@@ -204,7 +204,7 @@ Arguments:
 Returns:
 - Int: Occupation number n = Σᵢ (bᵢ - 1) × 2^(i-1)
 """
-function binary_state_to_decimal(binary_state::Vector{Int})
+function qubit_state_to_fock(binary_state::Vector{Int})
     n = 0
     for (i, bit) in enumerate(binary_state)
         (bit == 1 || bit == 2) || throw(ArgumentError("Binary state values must be 1 or 2"))

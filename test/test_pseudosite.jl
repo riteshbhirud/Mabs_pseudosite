@@ -38,40 +38,40 @@ using LinearAlgebra
 
     @testset "Binary Conversion" begin
         n_qubits = 3
-        @test Mabs.decimal_to_binary_state(0, n_qubits) == [1, 1, 1]
-        @test Mabs.decimal_to_binary_state(1, n_qubits) == [2, 1, 1]
-        @test Mabs.decimal_to_binary_state(2, n_qubits) == [1, 2, 1]
-        @test Mabs.decimal_to_binary_state(7, n_qubits) == [2, 2, 2]
-        @test Mabs.binary_state_to_decimal([1, 1, 1]) == 0
-        @test Mabs.binary_state_to_decimal([2, 1, 1]) == 1
-        @test Mabs.binary_state_to_decimal([1, 2, 1]) == 2
-        @test Mabs.binary_state_to_decimal([2, 2, 2]) == 7
+        @test Mabs.fock_to_qubit_state(0, n_qubits) == [1, 1, 1]
+        @test Mabs.fock_to_qubit_state(1, n_qubits) == [2, 1, 1]
+        @test Mabs.fock_to_qubit_state(2, n_qubits) == [1, 2, 1]
+        @test Mabs.fock_to_qubit_state(7, n_qubits) == [2, 2, 2]
+        @test Mabs.qubit_state_to_fock([1, 1, 1]) == 0
+        @test Mabs.qubit_state_to_fock([2, 1, 1]) == 1
+        @test Mabs.qubit_state_to_fock([1, 2, 1]) == 2
+        @test Mabs.qubit_state_to_fock([2, 2, 2]) == 7
         for n in 0:7
-            binary = Mabs.decimal_to_binary_state(n, n_qubits)
-            @test Mabs.binary_state_to_decimal(binary) == n
+            binary = Mabs.fock_to_qubit_state(n, n_qubits)
+            @test Mabs.qubit_state_to_fock(binary) == n
         end
     end
 
     @testset "Mode Cluster Access" begin
         alg = PseudoSite(2, 7)
         sites = create_qubit_sites(alg)
-        cluster1 = Mabs.get_mode_cluster(sites, alg, 1)
+        cluster1 = Mabs._get_mode_cluster(sites, alg, 1)
         @test length(cluster1) == 3
         @test all(ITensors.dim(s) == 2 for s in cluster1)
-        cluster2 = Mabs.get_mode_cluster(sites, alg, 2)
+        cluster2 = Mabs._get_mode_cluster(sites, alg, 2)
         @test length(cluster2) == 3
         @test cluster1 != cluster2
-        @test_throws ArgumentError Mabs.get_mode_cluster(sites, alg, 0)
-        @test_throws ArgumentError Mabs.get_mode_cluster(sites, alg, 3)
+        @test_throws ArgumentError Mabs._get_mode_cluster(sites, alg, 0)
+        @test_throws ArgumentError Mabs._get_mode_cluster(sites, alg, 3)
     end
 
     @testset "Quantics Number Operator" begin
         n_qubits = 3
         sites = [ITensors.Index(2, "Qubit,n=$i") for i in 1:n_qubits]
-        n_op = Mabs.number_op_quantics(sites)
+        n_op = Mabs._number_op_quantics(sites)
         for n in 0:7
-            binary_state = Mabs.decimal_to_binary_state(n, n_qubits)
-            psi = ITensorMPS.productMPS(sites, binary_state)
+            qubit_state = Mabs.fock_to_qubit_state(n, n_qubits)
+            psi = ITensorMPS.productMPS(sites, qubit_state)
             n_psi = ITensors.apply(n_op, psi)
             expectation = real(ITensorMPS.inner(psi, n_psi))
             @test abs(expectation - n) < 1e-10
@@ -81,12 +81,12 @@ using LinearAlgebra
     @testset "Quantics Creation Operator" begin
         n_qubits = 3
         sites = [ITensors.Index(2, "Qubit,n=$i") for i in 1:n_qubits]
-        a_dag = Mabs.create_op_quantics(sites)
+        a_dag = Mabs._create_op_quantics(sites)
         for n in 0:6
-            binary_n = Mabs.decimal_to_binary_state(n, n_qubits)
-            binary_n_plus_1 = Mabs.decimal_to_binary_state(n + 1, n_qubits)
-            psi_n = ITensorMPS.productMPS(sites, binary_n)
-            psi_n_plus_1 = ITensorMPS.productMPS(sites, binary_n_plus_1)
+            qubit_n = Mabs.fock_to_qubit_state(n, n_qubits)
+            qubit_n_plus_1 = Mabs.fock_to_qubit_state(n + 1, n_qubits)
+            psi_n = ITensorMPS.productMPS(sites, qubit_n)
+            psi_n_plus_1 = ITensorMPS.productMPS(sites, qubit_n_plus_1)
             adag_psi = ITensors.apply(a_dag, psi_n)
             ITensorMPS.normalize!(adag_psi)
             overlap = abs(ITensorMPS.inner(psi_n_plus_1, adag_psi))
@@ -97,19 +97,19 @@ using LinearAlgebra
     @testset "Quantics Annihilation Operator" begin
         n_qubits = 3
         sites = [ITensors.Index(2, "Qubit,n=$i") for i in 1:n_qubits]
-        a = Mabs.destroy_op_quantics(sites)
+        a = Mabs._destroy_op_quantics(sites)
         for n in 1:7
-            binary_n = Mabs.decimal_to_binary_state(n, n_qubits)
-            binary_n_minus_1 = Mabs.decimal_to_binary_state(n - 1, n_qubits)
-            psi_n = ITensorMPS.productMPS(sites, binary_n)
-            psi_n_minus_1 = ITensorMPS.productMPS(sites, binary_n_minus_1)
+            qubit_n = Mabs.fock_to_qubit_state(n, n_qubits)
+            qubit_n_minus_1 = Mabs.fock_to_qubit_state(n - 1, n_qubits)
+            psi_n = ITensorMPS.productMPS(sites, qubit_n)
+            psi_n_minus_1 = ITensorMPS.productMPS(sites, qubit_n_minus_1)
             a_psi = ITensors.apply(a, psi_n)
             ITensorMPS.normalize!(a_psi)
             overlap = abs(ITensorMPS.inner(psi_n_minus_1, a_psi))
             @test abs(overlap - 1.0) < 1e-10
         end
-        binary_0 = Mabs.decimal_to_binary_state(0, n_qubits)
-        psi_0 = ITensorMPS.productMPS(sites, binary_0)
+        qubit_0 = Mabs.fock_to_qubit_state(0, n_qubits)
+        psi_0 = ITensorMPS.productMPS(sites, qubit_0)
         a_psi_0 = ITensors.apply(a, psi_0)
         @test ITensorMPS.norm(a_psi_0) < 1e-10
     end
@@ -117,11 +117,11 @@ using LinearAlgebra
     @testset "Bosonic Commutation Relations (Quantics)" begin
         n_qubits = 3
         sites = [ITensors.Index(2, "Qubit,n=$i") for i in 1:n_qubits]
-        a = Mabs.destroy_op_quantics(sites)
-        a_dag = Mabs.create_op_quantics(sites)
+        a = Mabs._destroy_op_quantics(sites)
+        a_dag = Mabs._create_op_quantics(sites)
         for n in 0:5
-            binary_n = Mabs.decimal_to_binary_state(n, n_qubits)
-            psi_n = ITensorMPS.productMPS(sites, binary_n)
+            qubit_n = Mabs.fock_to_qubit_state(n, n_qubits)
+            psi_n = ITensorMPS.productMPS(sites, qubit_n)
             temp1 = ITensors.apply(a, psi_n)
             adag_a_psi = ITensors.apply(a_dag, temp1)
             exp1 = real(ITensorMPS.inner(psi_n, adag_a_psi))
@@ -229,10 +229,10 @@ using LinearAlgebra
         n_qubits = 3
         sites = [ITensors.Index(2, "Qubit,n=$i") for i in 1:n_qubits]
         α = 0.5
-        D = Mabs.displace_op_quantics(sites, α)
+        D = Mabs._displace_op_quantics(sites, α)
         @test D isa ITensors.ITensor
-        binary_0 = Mabs.decimal_to_binary_state(0, n_qubits)
-        psi_vac = ITensorMPS.productMPS(sites, binary_0)
+        qubit_0 = Mabs.fock_to_qubit_state(0, n_qubits)
+        psi_vac = ITensorMPS.productMPS(sites, qubit_0)
         D_psi = ITensors.apply(D, psi_vac)
         ITensorMPS.normalize!(D_psi)
         @test abs(norm(D_psi) - 1.0) < 1e-8
@@ -242,10 +242,10 @@ using LinearAlgebra
         n_qubits = 3
         sites = [ITensors.Index(2, "Qubit,n=$i") for i in 1:n_qubits]
         ξ = 0.3
-        S = Mabs.squeeze_op_quantics(sites, ξ)
+        S = Mabs._squeeze_op_quantics(sites, ξ)
         @test S isa ITensors.ITensor
-        binary_0 = Mabs.decimal_to_binary_state(0, n_qubits)
-        psi_vac = ITensorMPS.productMPS(sites, binary_0)
+        qubit_0 = Mabs.fock_to_qubit_state(0, n_qubits)
+        psi_vac = ITensorMPS.productMPS(sites, qubit_0)
         S_psi = ITensors.apply(S, psi_vac)
         ITensorMPS.normalize!(S_psi)
         @test abs(norm(S_psi) - 1.0) < 1e-6

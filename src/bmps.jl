@@ -183,16 +183,16 @@ function BMPS(sites::Vector{<:ITensors.Index}, states::Vector, alg::PseudoSite)
     length(states) == alg.n_modes || 
         throw(ArgumentError("Number of states $(length(states)) must match modes $(alg.n_modes))"))
     n_qubits = n_qubits_per_mode(alg)
-    binary_states = Vector{Int}(undef, n_expected) 
+    qubit_states = Vector{Int}(undef, n_expected) 
     idx = 1
     for (mode_idx, n) in enumerate(states)
         n <= alg.fock_cutoff || 
             throw(ArgumentError("State $n exceeds maximum $(alg.fock_cutoff)"))
-        binary_state = Mabs.decimal_to_binary_state(n, n_qubits)
-        copyto!(binary_states, idx, binary_state, 1, n_qubits)
+        qubit_state = Mabs.fock_to_qubit_state(n, n_qubits)
+        copyto!(qubit_states, idx, qubit_state, 1, n_qubits)
         idx += n_qubits
     end
-    mps = ITensorMPS.productMPS(sites, binary_states)
+    mps = ITensorMPS.productMPS(sites, qubit_states)
     return BMPS{typeof(mps), typeof(alg)}(mps, alg)
 end
 for f in [

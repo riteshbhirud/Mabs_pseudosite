@@ -60,12 +60,12 @@ function _matrix_to_cluster_operator(matrix::Matrix{ComplexF64},
     op = ITensors.ITensor(ComplexF64, cluster_sites'..., cluster_sites...)
     
     for m in 0:(dim-1)
-        binary_m = decimal_to_binary_state(m, n_qubits)
+        qubit_m = fock_to_qubit_state(m, n_qubits)
         for n in 0:(dim-1)
             element = matrix[m+1, n+1]
             if abs(element) > 1e-15  
-                binary_n = decimal_to_binary_state(n, n_qubits)
-                set_cluster_matrix_element!(op, cluster_sites, binary_m, binary_n, element)
+                qubit_n = fock_to_qubit_state(n, n_qubits)
+                set_cluster_matrix_element!(op, cluster_sites, qubit_m, qubit_n, element)
             end
         end
     end
@@ -74,7 +74,7 @@ function _matrix_to_cluster_operator(matrix::Matrix{ComplexF64},
 end
 
 """
-    number_op_quantics(cluster_sites::Vector{<:ITensors.Index})
+    _number_op_quantics(cluster_sites::Vector{<:ITensors.Index})
 
 Create number operator in quantics representation.
 
@@ -84,7 +84,7 @@ Arguments:
 Returns:
 - ITensors.ITensor: Number operator n̂ = Σₙ n|n⟩⟨n|
 """
-function number_op_quantics(cluster_sites::Vector{<:ITensors.Index})
+function _number_op_quantics(cluster_sites::Vector{<:ITensors.Index})
     n_qubits = length(cluster_sites)
     max_occ = 2^n_qubits - 1
     n_matrix = zeros(ComplexF64, max_occ+1, max_occ+1)
@@ -95,7 +95,7 @@ function number_op_quantics(cluster_sites::Vector{<:ITensors.Index})
 end
 
 """
-    create_op_quantics(cluster_sites::Vector{<:ITensors.Index})
+    _create_op_quantics(cluster_sites::Vector{<:ITensors.Index})
 
 Create bosonic creation operator in quantics representation.
 
@@ -105,7 +105,7 @@ Arguments:
 Returns:
 - ITensors.ITensor: Creation operator a† with ⟨n+1|a†|n⟩ = √(n+1)
 """
-function create_op_quantics(cluster_sites::Vector{<:ITensors.Index})
+function _create_op_quantics(cluster_sites::Vector{<:ITensors.Index})
     n_qubits = length(cluster_sites)
     max_occ = 2^n_qubits - 1
     a_dag_matrix = zeros(ComplexF64, max_occ+1, max_occ+1)
@@ -116,7 +116,7 @@ function create_op_quantics(cluster_sites::Vector{<:ITensors.Index})
 end
 
 """
-    destroy_op_quantics(cluster_sites::Vector{<:ITensors.Index})
+    _destroy_op_quantics(cluster_sites::Vector{<:ITensors.Index})
 
 Create bosonic annihilation operator in quantics representation.
 
@@ -126,7 +126,7 @@ Arguments:
 Returns:
 - ITensors.ITensor: Annihilation operator a with ⟨n-1|a|n⟩ = √n
 """
-function destroy_op_quantics(cluster_sites::Vector{<:ITensors.Index})
+function _destroy_op_quantics(cluster_sites::Vector{<:ITensors.Index})
     n_qubits = length(cluster_sites)
     max_occ = 2^n_qubits - 1
     a_matrix = zeros(ComplexF64, max_occ+1, max_occ+1)
@@ -137,7 +137,7 @@ function destroy_op_quantics(cluster_sites::Vector{<:ITensors.Index})
 end
 
 """
-    displace_op_quantics(cluster_sites::Vector{<:ITensors.Index}, α::Number)
+    _displace_op_quantics(cluster_sites::Vector{<:ITensors.Index}, α::Number)
 
 Create displacement operator in quantics representation.
 D(α) = exp(α*a† - α*a)
@@ -149,7 +149,7 @@ Arguments:
 Returns:
 - ITensors.ITensor: Displacement operator
 """
-function displace_op_quantics(cluster_sites::Vector{<:ITensors.Index}, α::Number)
+function _displace_op_quantics(cluster_sites::Vector{<:ITensors.Index}, α::Number)
     n_qubits = length(cluster_sites)
     max_occ = 2^n_qubits - 1
     D_matrix = zeros(ComplexF64, max_occ+1, max_occ+1)
@@ -187,7 +187,7 @@ function _displacement_matrix_element(m::Int, n::Int, α::Number)
 end
 
 """
-    squeeze_op_quantics(cluster_sites::Vector{<:ITensors.Index}, ξ::Number)
+    _squeeze_op_quantics(cluster_sites::Vector{<:ITensors.Index}, ξ::Number)
 
 Create squeezing operator in quantics representation.
 S(ξ) = exp(0.5*(ξ*a†² - ξ*a²))
@@ -199,7 +199,7 @@ Arguments:
 Returns:
 - ITensors.ITensor: Squeezing operator
 """
-function squeeze_op_quantics(cluster_sites::Vector{<:ITensors.Index}, ξ::Number)
+function _squeeze_op_quantics(cluster_sites::Vector{<:ITensors.Index}, ξ::Number)
     n_qubits = length(cluster_sites)
     max_occ = 2^n_qubits - 1
     S_matrix = zeros(ComplexF64, max_occ+1, max_occ+1)
@@ -244,7 +244,7 @@ function _squeezing_matrix_element(m::Int, n::Int, r::Real, φ::Real)
 end
 
 """
-    kerr_op_quantics(cluster_sites::Vector{<:ITensors.Index}, χ::Real, t::Real)
+    _kerr_op_quantics(cluster_sites::Vector{<:ITensors.Index}, χ::Real, t::Real)
 
 Create Kerr evolution operator in quantics representation.
 K(χ,t) = exp(-i*χ*t*n²)
@@ -257,7 +257,7 @@ Arguments:
 Returns:
 - ITensors.ITensor: Kerr evolution operator
 """
-function kerr_op_quantics(cluster_sites::Vector{<:ITensors.Index}, χ::Real, t::Real)
+function _kerr_op_quantics(cluster_sites::Vector{<:ITensors.Index}, χ::Real, t::Real)
     n_qubits = length(cluster_sites)
     max_occ = 2^n_qubits - 1
     K_matrix = zeros(ComplexF64, max_occ+1, max_occ+1)
@@ -282,8 +282,8 @@ Returns:
 function expect_photon_number(psi::BMPS{<:ITensorMPS.MPS,<:PseudoSite}, mode::Int)
     alg = psi.alg
     sites = ITensorMPS.siteinds(psi.mps)
-    cluster_sites = get_mode_cluster(sites, alg, mode)
-    n_op = number_op_quantics(cluster_sites)
+    cluster_sites = _get_mode_cluster(sites, alg, mode)
+    n_op = _number_op_quantics(cluster_sites)
     n_psi = ITensors.apply(n_op, psi.mps)
     return real(ITensorMPS.inner(psi.mps, n_psi))
 end
@@ -323,10 +323,10 @@ function build_hopping_mpo(
         if abs(mat_elem) < 1e-15
             continue
         end
-        bra_states_i = decimal_to_binary_state(ni, n_qubits)
-        bra_states_j = decimal_to_binary_state(nj, n_qubits)
-        ket_states_i = decimal_to_binary_state(ni + 1, n_qubits)
-        ket_states_j = decimal_to_binary_state(nj - 1, n_qubits)
+        bra_states_i = fock_to_qubit_state(ni, n_qubits)
+        bra_states_j = fock_to_qubit_state(nj, n_qubits)
+        ket_states_i = fock_to_qubit_state(ni + 1, n_qubits)
+        ket_states_j = fock_to_qubit_state(nj - 1, n_qubits)
         mpo_tensors = Vector{ITensors.ITensor}(undef, n_total)
         for site_idx in 1:n_total
             s = sites[site_idx]
@@ -365,10 +365,10 @@ function build_hopping_mpo(
         if abs(mat_elem) < 1e-15
             continue
         end
-        bra_states_i = decimal_to_binary_state(ni, n_qubits)
-        bra_states_j = decimal_to_binary_state(nj, n_qubits)
-        ket_states_i = decimal_to_binary_state(ni - 1, n_qubits)
-        ket_states_j = decimal_to_binary_state(nj + 1, n_qubits)
+        bra_states_i = fock_to_qubit_state(ni, n_qubits)
+        bra_states_j = fock_to_qubit_state(nj, n_qubits)
+        ket_states_i = fock_to_qubit_state(ni - 1, n_qubits)
+        ket_states_j = fock_to_qubit_state(nj + 1, n_qubits)
         mpo_tensors = Vector{ITensors.ITensor}(undef, n_total)
         for site_idx in 1:n_total
             s = sites[site_idx]

@@ -207,34 +207,167 @@ function kerr(sites::Vector{<:ITensors.Index}; ω::Real=1.0, χ::Real=0.1)
     return BMPO(mpo, Truncated())
 end
 
+"""
+    create(sites::Vector{<:ITensors.Index}, alg::PseudoSite, mode::Int)
+
+Create bosonic creation operator for a specific mode in PseudoSite representation.
+
+Arguments:
+- sites::Vector{<:ITensors.Index}: All qubit site indices for the system
+- alg::PseudoSite: Algorithm specification
+- mode::Int: Bosonic mode index (1 to n_modes)
+
+Returns:
+- ITensors.ITensor: Creation operator â† for the specified mode
+
+# Example
+
+    alg = PseudoSite(2, 7)  # 2 modes, 3 qubits each
+    sites = create_qubit_sites(alg)
+    
+    # Creation operator for mode 1
+    a1_dag = create(sites, alg, 1)
+    
+    # Creation operator for mode 2  
+    a2_dag = create(sites, alg, 2)
+"""
 function create(sites::Vector{<:ITensors.Index}, alg::PseudoSite, mode::Int)
-    cluster_sites = get_mode_cluster(sites, alg, mode)
-    return create_op_quantics(cluster_sites)
+    cluster_sites = _get_mode_cluster(sites, alg, mode)
+    return _create_op_quantics(cluster_sites)
 end
 
+"""
+    destroy(sites::Vector{<:ITensors.Index}, alg::PseudoSite, mode::Int)
+
+Create bosonic annihilation operator for a specific mode in PseudoSite representation.
+
+Arguments:
+- sites::Vector{<:ITensors.Index}: All qubit site indices for the system
+- alg::PseudoSite: Algorithm specification
+- mode::Int: Bosonic mode index (1 to n_modes)
+
+Returns:
+- ITensors.ITensor: Annihilation operator â for the specified mode
+
+# Example
+
+    alg = PseudoSite(2, 7)
+    sites = create_qubit_sites(alg)
+    
+    # Annihilation operator for mode 1
+    a1 = destroy(sites, alg, 1)
+"""
 function destroy(sites::Vector{<:ITensors.Index}, alg::PseudoSite, mode::Int)
-    cluster_sites = get_mode_cluster(sites, alg, mode)
-    return destroy_op_quantics(cluster_sites)
+    cluster_sites = _get_mode_cluster(sites, alg, mode)
+    return _destroy_op_quantics(cluster_sites)
 end
 
+"""
+    number(sites::Vector{<:ITensors.Index}, alg::PseudoSite, mode::Int)
+
+Create bosonic number operator for a specific mode in PseudoSite representation.
+
+Arguments:
+- sites::Vector{<:ITensors.Index}: All qubit site indices for the system
+- alg::PseudoSite: Algorithm specification
+- mode::Int: Bosonic mode index (1 to n_modes)
+
+Returns:
+- ITensors.ITensor: Number operator n̂ for the specified mode
+
+# Example
+
+    alg = PseudoSite(2, 7)
+    sites = create_qubit_sites(alg)
+    
+    # Number operator for mode 1
+    n1 = number(sites, alg, 1)
+"""
 function number(sites::Vector{<:ITensors.Index}, alg::PseudoSite, mode::Int)
-    cluster_sites = get_mode_cluster(sites, alg, mode)
-    return number_op_quantics(cluster_sites)
+    cluster_sites = _get_mode_cluster(sites, alg, mode)
+    return _number_op_quantics(cluster_sites)
 end
 
+"""
+    displace(sites::Vector{<:ITensors.Index}, α::Number, alg::PseudoSite, mode::Int)
+
+Create displacement operator for a specific mode in PseudoSite representation.
+
+Arguments:
+- sites::Vector{<:ITensors.Index}: All qubit site indices for the system
+- α::Number: Displacement amplitude (can be complex)
+- alg::PseudoSite: Algorithm specification
+- mode::Int: Bosonic mode index (1 to n_modes)
+
+Returns:
+- ITensors.ITensor: Displacement operator D(α) = exp(α â† - α* â) for the specified mode
+
+# Example
+
+    alg = PseudoSite(2, 7)
+    sites = create_qubit_sites(alg)
+    
+    # Displace mode 1 by α = 1.5
+    D1 = displace(sites, 1.5, alg, 1)
+"""
 function displace(sites::Vector{<:ITensors.Index}, α::Number, alg::PseudoSite, mode::Int)
-    cluster_sites = get_mode_cluster(sites, alg, mode)
-    return displace_op_quantics(cluster_sites, α)
+    cluster_sites = _get_mode_cluster(sites, alg, mode)
+    return _displace_op_quantics(cluster_sites, α)
 end
 
+"""
+    squeeze(sites::Vector{<:ITensors.Index}, ξ::Number, alg::PseudoSite, mode::Int)
+
+Create squeeze operator for a specific mode in PseudoSite representation.
+
+Arguments:
+- sites::Vector{<:ITensors.Index}: All qubit site indices for the system
+- ξ::Number: Squeezing parameter (can be complex)
+- alg::PseudoSite: Algorithm specification
+- mode::Int: Bosonic mode index (1 to n_modes)
+
+Returns:
+- ITensors.ITensor: Squeeze operator S(ξ) = exp(½(ξ â†² - ξ* â²)) for the specified mode
+
+# Example
+
+    alg = PseudoSite(2, 7)
+    sites = create_qubit_sites(alg)
+    
+    # Squeeze mode 1 with parameter 0.5
+    S1 = squeeze(sites, 0.5, alg, 1)
+"""
 function squeeze(sites::Vector{<:ITensors.Index}, ξ::Number, alg::PseudoSite, mode::Int)
-    cluster_sites = get_mode_cluster(sites, alg, mode)
-    return squeeze_op_quantics(cluster_sites, ξ)
+    cluster_sites = _get_mode_cluster(sites, alg, mode)
+    return _squeeze_op_quantics(cluster_sites, ξ)
 end
 
+"""
+    kerr(sites::Vector{<:ITensors.Index}, χ::Real, t::Real, alg::PseudoSite, mode::Int)
+
+Create Kerr evolution operator for a specific mode in PseudoSite representation.
+
+Arguments:
+- sites::Vector{<:ITensors.Index}: All qubit site indices for the system
+- χ::Real: Kerr nonlinearity strength
+- t::Real: Evolution time
+- alg::PseudoSite: Algorithm specification
+- mode::Int: Bosonic mode index (1 to n_modes)
+
+Returns:
+- ITensors.ITensor: Kerr operator exp(-i χ t n̂²) for the specified mode
+
+# Example
+
+    alg = PseudoSite(2, 7)
+    sites = create_qubit_sites(alg)
+    
+    # Kerr evolution for mode 1
+    K1 = kerr(sites, 0.1, 1.0, alg, 1)
+"""
 function kerr(sites::Vector{<:ITensors.Index}, χ::Real, t::Real, alg::PseudoSite, mode::Int)
-    cluster_sites = get_mode_cluster(sites, alg, mode)
-    return kerr_op_quantics(cluster_sites, χ, t)
+    cluster_sites = _get_mode_cluster(sites, alg, mode)
+    return _kerr_op_quantics(cluster_sites, χ, t)
 end
 
 """

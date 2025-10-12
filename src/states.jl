@@ -146,7 +146,7 @@ end
     coherentstate(sites::Vector{<:ITensors.Index}, αs::Vector{<:Number}, alg::PseudoSite)
 
 Create multi-mode coherent state in PseudoSite representation.
-Uses optimized MPS construction with proper gauge fixing.
+Uses MPS construction with proper gauge fixing.
 """
 function coherentstate(sites::Vector{<:ITensors.Index}, αs::Vector{<:Number}, alg::PseudoSite)
     n_expected = alg.n_modes * n_qubits_per_mode(alg)
@@ -163,22 +163,35 @@ function coherentstate(sites::Vector{<:ITensors.Index}, αs::Vector{<:Number}, a
 end
 
 """
-Direct summation approach for coherent states - OPTIMIZED VERSION
+    _coherent_state_direct_sum(sites::Vector{<:ITensors.Index}, 
+                                αs::Vector{<:Number}, 
+                                alg::PseudoSite)
+
+Direct summation approach for coherent states in PseudoSite representation.
+Enumerates significant Fock state contributions and sums them as product states.
+
+This approach is efficient for small cutoffs (≤15) where the number of significant
+Fock states is manageable. For larger cutoffs, use displacement operator approach.
 """
-function _coherent_state_direct_sum(sites::Vector{<:ITensors.Index},
-                                     αs::Vector{<:Number},
-                                     alg::PseudoSite)
+function _coherent_state_direct_sum(sites::Vector{<:ITensors.Index}, 
+                                    αs::Vector{<:Number}, 
+                                    alg::PseudoSite)
     n_modes = alg.n_modes
     n_qubits = n_qubits_per_mode(alg)
     max_occ = alg.fock_cutoff
     
+    # |α⟩ = exp(-|α|²/2) Σₙ (αⁿ/√n!) |n⟩
     all_fock_coeffs = [_coherent_fock_coefficients_raw(α, max_occ) for α in αs]
+    
+    # Determine cutoff for significance -- ignore coefficients below this threshold
     max_coeff = maximum(maximum(abs.(coeffs)) for coeffs in all_fock_coeffs)
     cutoff = 1e-12 * max_coeff
     
+    # Storage for significant multi-mode Fock states and their coefficients
     fock_states_list = Vector{Vector{Int}}()
     coefficients_list = Vector{ComplexF64}()
     
+    # Recursively enumerate all significant Fock state combinations
     function enumerate_states!(current_state::Vector{Int}, mode_idx::Int)
         if mode_idx > n_modes
             coeff = ComplexF64(1.0)
@@ -205,44 +218,33 @@ function _coherent_state_direct_sum(sites::Vector{<:ITensors.Index},
     enumerate_states!(current_state, 1)
     
     if isempty(fock_states_list)
-        error("No significant Fock states found")
+        error("No significant Fock states found - try larger cutoff or displacement method")
     end
     
+    # Normalize collected coefficients
     norm_factor = sqrt(sum(abs2, coefficients_list))
     coefficients_list ./= norm_factor
-    
+    qubit_states = Vector{Int}(undef, n_modes * n_qubits)
     result_mps = nothing
-    for (idx, (fock_state, coeff)) in enumerate(zip(fock_states_list, coefficients_list))
-        binary_states = Int[]
+    for (fock_state, coeff) in zip(fock_states_list, coefficients_list)
+        idx = 1
         for mode in 1:n_modes
-            append!(binary_states, decimal_to_binary_state(fock_state[mode], n_qubits))
+            qubit_state = fock_to_qubit_state(fock_state[mode], n_qubits)
+            copyto!(qubit_states, idx, qubit_state, 1, n_qubits)
+            idx += n_qubits
         end
+        term_mps = ITensorMPS.productMPS(sites, qubit_states)
+        term_mps[1] *= coeff  
         
-        term_mps = ITensorMPS.productMPS(sites, binary_states)
-        term_norm_before = ITensorMPS.norm(term_mps)
-        term_mps[1] *= coeff
-        term_norm_after = ITensorMPS.norm(term_mps)
-        
+        # Add to accumulating superposition
         if result_mps === nothing
             result_mps = term_mps
         else
-            prev_norm = ITensorMPS.norm(result_mps)
             result_mps = ITensorMPS.add(result_mps, term_mps; cutoff=1e-15)
-            new_norm = ITensorMPS.norm(result_mps)
         end
     end
-    
-    final_norm_before = ITensorMPS.norm(result_mps)
-    inner_val = ITensorMPS.inner(result_mps, result_mps)
     ITensorMPS.normalize!(result_mps)
-    norm_after_normalize = ITensorMPS.norm(result_mps)
-    final_norm = ITensorMPS.norm(result_mps)
-    inner_final = ITensorMPS.inner(result_mps, result_mps)
-    
-    bmps = BMPS(result_mps, alg)
-    LinearAlgebra.normalize!(bmps)
-    
-    return bmps
+    return BMPS(result_mps, alg)
 end
 
 """
@@ -275,96 +277,13 @@ function _coherent_state_via_displacement(sites::Vector{<:ITensors.Index},
     for mode_idx in 1:alg.n_modes
         α = αs[mode_idx]
         if abs(α) > 1e-10  
-            cluster_sites = get_mode_cluster(sites, alg, mode_idx)
+            cluster_sites = _get_mode_cluster(sites, alg, mode_idx)
             D = displace_op_quantics(cluster_sites, α)
             psi.mps = ITensors.apply(D, psi.mps; cutoff=1e-12, maxdim=256)
         end
     end    
     LinearAlgebra.normalize!(psi)
     return psi
-end
-
-"""
-    _state_vector_to_mps(state_vector::Vector{ComplexF64}, 
-                        sites::Vector{ITensors.Index})
-
-Convert full state vector to MPS via tensor train decomposition.
-Properly normalized by construction through SVD.
-"""
-function _state_vector_to_mps(state_vector::Vector{ComplexF64}, 
-                              sites::Vector{ITensors.Index})
-    n_sites = length(sites)
-    total_dim = 2^n_sites
-    
-    if length(state_vector) != total_dim
-        error("State vector size mismatch: got $(length(state_vector)), expected $total_dim")
-    end
-    norm_val = sqrt(sum(abs2, state_vector))
-    if abs(norm_val - 1.0) > 1e-10
-        @warn "State vector not normalized: norm = $norm_val"
-        state_vector = state_vector / norm_val
-    end
-    if n_sites == 1
-        tensor = ITensors.ITensor(ComplexF64, sites[1])
-        tensor[sites[1] => 1] = state_vector[1]
-        tensor[sites[1] => 2] = state_vector[2]
-        return ITensorMPS.MPS([tensor])
-    end
-    tensors = Vector{ITensors.ITensor}(undef, n_sites)
-    current_data = copy(state_vector)
-    left_dim = 1
-    prev_right_link::Union{Nothing, ITensors.Index} = nothing
-    for site_idx in 1:n_sites
-        site = sites[site_idx]
-        if site_idx == n_sites
-            tensor = ITensors.ITensor(ComplexF64, prev_right_link, site)
-            for l in 1:left_dim
-                tensor[prev_right_link => l, site => 1] = current_data[2*(l-1) + 1]
-                tensor[prev_right_link => l, site => 2] = current_data[2*(l-1) + 2]
-            end
-            tensors[site_idx] = tensor
-        else
-            n_remaining_sites = n_sites - site_idx
-            right_dim = 2^n_remaining_sites
-            row_dim = left_dim * 2
-            matrix = reshape(current_data, row_dim, right_dim)
-            F = LinearAlgebra.svd(matrix)
-            cutoff = 1e-14
-            max_bond = 512
-            n_keep = count(s -> s > cutoff * F.S[1], F.S)
-            n_keep = max(1, min(n_keep, max_bond, length(F.S)))
-            U_trunc = F.U[:, 1:n_keep]
-            S_trunc = F.S[1:n_keep]
-            V_trunc = F.Vt[1:n_keep, :]
-            right_link = ITensors.Index(n_keep, "Link,l=$site_idx")
-            if site_idx == 1
-                tensor = ITensors.ITensor(ComplexF64, site, right_link)
-                for s in 1:2, r in 1:n_keep
-                    tensor[site => s, right_link => r] = U_trunc[s, r]
-                end
-            else
-                tensor = ITensors.ITensor(ComplexF64, prev_right_link, site, right_link)
-                row_idx = 1
-                for l in 1:left_dim, s in 1:2
-                    for r in 1:n_keep
-                        tensor[prev_right_link => l, site => s, right_link => r] = U_trunc[row_idx, r]
-                    end
-                    row_idx += 1
-                end
-            end
-            tensors[site_idx] = tensor
-            
-            prev_right_link = right_link
-            current_data = vec(LinearAlgebra.Diagonal(S_trunc) * V_trunc)
-            left_dim = n_keep
-        end
-    end
-    mps = ITensorMPS.MPS(tensors)
-    mps_norm = ITensorMPS.norm(mps)
-    if abs(mps_norm - 1.0) > 1e-10
-        ITensorMPS.normalize!(mps)
-    end
-    return mps
 end
 
 """
@@ -382,71 +301,4 @@ function _coherent_fock_coefficients(α::Number, max_occ::Int)
     norm_factor = sqrt(sum(abs2, coeffs))
     coeffs ./= norm_factor
     return coeffs
-end
-
-"""
-    _fill_product_state!(state_vector::Vector{ComplexF64}, 
-                        all_fock_coeffs::Vector{Vector{ComplexF64}},
-                        alg::PseudoSite)
-
-Fill product state vector with Fock state superposition.
-Only fills non-negligible coefficients for efficiency.
-"""
-function _fill_product_state!(state_vector::Vector{ComplexF64},
-                               all_fock_coeffs::Vector{Vector{ComplexF64}},
-                              alg::PseudoSite)
-    n_modes = alg.n_modes
-    max_occ = alg.fock_cutoff
-    n_qubits = n_qubits_per_mode(alg)
-    
-    max_coeff = maximum(maximum(abs.(coeffs)) for coeffs in all_fock_coeffs)
-    cutoff = 1e-15 * max_coeff
-    
-    fock_states = zeros(Int, n_modes)
-    _recursive_fill!(state_vector, all_fock_coeffs, alg, fock_states, 1, cutoff)
-end
-
-"""
-    _recursive_fill! with cutoff
-
-Recursively fill state vector, skipping negligible terms.
-"""
-function _recursive_fill!(state_vector::Vector{ComplexF64},
-                         all_fock_coeffs::Vector{Vector{ComplexF64}},
-                         alg::PseudoSite,
-                         fock_states::Vector{Int},
-                         mode_idx::Int,
-                         cutoff::Float64)
-    n_modes = alg.n_modes
-    max_occ = alg.fock_cutoff
-    n_qubits_per_mode = n_qubits_per_mode(alg)
-    
-    if mode_idx > n_modes
-        coeff = ComplexF64(1.0)
-        for m in 1:n_modes
-            coeff *= all_fock_coeffs[m][fock_states[m] + 1]
-        end
-        if abs(coeff) < cutoff
-            return
-        end
-        binary_state = Int[]
-        for m in 1:n_modes
-            append!(binary_state, decimal_to_binary_state(fock_states[m], n_qubits_per_mode))
-        end
-        linear_idx = 1
-        for i in 1:length(binary_state)
-            bit_val = binary_state[i] - 1  
-            linear_idx += bit_val * (1 << (i-1))  
-        end
-        state_vector[linear_idx] = coeff
-        return
-    end
-    
-    for n in 0:max_occ
-        if abs(all_fock_coeffs[mode_idx][n+1]) < cutoff
-            continue
-        end
-        fock_states[mode_idx] = n
-        _recursive_fill!(state_vector, all_fock_coeffs, alg, fock_states, mode_idx + 1, cutoff)
-    end
 end
