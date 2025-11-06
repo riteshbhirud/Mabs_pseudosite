@@ -9,17 +9,18 @@ function _safe_factorial(n::Int)
 end
 
 """
-    create(site::ITensors.Index)
+    create(site::ITensors.Index, alg::MabsAlg)
 
 Create the bosonic creation operator (raising operator) for a given site.
 
 Arguments:
 - site::ITensors.Index: Site index with bosonic tag
+- alg::MabsAlg: Bosonic MPS algorithm
 
 Returns:
 - ITensors.ITensor: Creation operator tensor
 """
-function create(site::ITensors.Index)
+function create(site::ITensors.Index, alg::Truncated)
     max_occ = ITensors.dim(site) - 1
     op = ITensors.ITensor(ComplexF64, site', site)
     @inbounds for n in 0:(max_occ-1)
@@ -29,17 +30,18 @@ function create(site::ITensors.Index)
 end
 
 """
-    destroy(site::ITensors.Index)
+    destroy(site::ITensors.Index, alg::MabsAlg)
 
 Create the bosonic annihilation operator (lowering operator) for a given site.
 
 Arguments:
 - site::ITensors.Index: Site index with bosonic tag
+- alg::MabsAlg: Bosonic MPS algorithm
 
 Returns:
 - ITensors.ITensor: Annihilation operator tensor
 """
-function destroy(site::ITensors.Index)
+function destroy(site::ITensors.Index, alg::Truncated)
     max_occ = ITensors.dim(site) - 1
     op = ITensors.ITensor(ComplexF64, site', site)
     @inbounds for n in 1:max_occ
@@ -49,17 +51,18 @@ function destroy(site::ITensors.Index)
 end
 
 """
-    number(site::ITensors.Index)
+    number(site::ITensors.Index, alg::Truncated)
 
 Create the bosonic number operator for a given site.
 
 Arguments:
 - site::ITensors.Index: Site index with bosonic tag
+- alg::MabsAlg: Bosonic MPS algorithm
 
 Returns:
 - ITensors.ITensor: Number operator tensor
 """
-function number(site::ITensors.Index)
+function number(site::ITensors.Index, alg::Truncated)
     max_occ = ITensors.dim(site) - 1
     op = ITensors.ITensor(ComplexF64, site', site)
     @inbounds for n in 0:max_occ
@@ -69,40 +72,42 @@ function number(site::ITensors.Index)
 end
 
 """
-    displace(site::ITensors.Index, α::Number)
+    displace(site::ITensors.Index, alg::MabsAlg, α::Number)
 
 Create the displacement operator `D(α) = exp(α*a† - α*a)` for a given site.
 
 Arguments:
 - site::ITensors.Index: Site index with bosonic tag
+- alg::MabsAlg: Bosonic MPS algorithm
 - α::Number: Displacement amplitude (can be complex)
 
 Returns:
 - ITensors.ITensor: Displacement operator tensor
 """
-function displace(site::ITensors.Index, α::Number)
+function displace(site::ITensors.Index, alg::Truncated, α::Number)
     #  G = α*a† - α*a
-    a_dag = create(site)
-    a = destroy(site)
+    a_dag = create(site, alg)
+    a = destroy(site, alg)
     generator = α * a_dag - conj(α) * a
     op = ITensors.exp(generator)
     return op
 end
 
 """
-    squeeze(site::ITensors.Index, ξ::Number)
+    squeeze(site::ITensors.Index, alg::MabsAlg, ξ::Number)
 
 Create the squeezing operator `S(ξ) = exp(0.5*(ξ*a†² - ξ*a²))` for a given site.
 Uses direct matrix element construction for numerical stability.
 
 Arguments:
-- site::ITensors.Index: Site index with bosonic tag  
+- site::ITensors.Index: Site index with bosonic tag
+- alg::MabsAlg: Bosonic MPS algorithm
 - ξ::Number: Squeezing parameter (can be complex)
 
 Returns:
 - ITensors.ITensor: Squeezing operator tensor
 """
-function squeeze(site::ITensors.Index, ξ::Number)
+function squeeze(site::ITensors.Index, alg::Truncated, ξ::Number)
     max_occ = ITensors.dim(site) - 1
     op = ITensors.ITensor(ComplexF64, site', site)
     r = abs(ξ)
@@ -129,19 +134,20 @@ function squeeze(site::ITensors.Index, ξ::Number)
 end
 
 """
-    kerr(site::ITensors.Index, χ::Real, t::Real)
+    kerr(site::ITensors.Index, alg::MabsAlg, χ::Real, t::Real)
 
 Create the Kerr evolution operator `exp(-i*χ*t*n²)` for a given site.
 
 Arguments:
 - site::ITensors.Index: Site index with bosonic tag
+- alg::MabsAlg: Bosonic MPS algorithm
 - χ::Real: Kerr nonlinearity strength
 - t::Real: Evolution time
 
 Returns:
 - ITensors.ITensor: Kerr evolution operator tensor
 """
-function kerr(site::ITensors.Index, χ::Real, t::Real)
+function kerr(site::ITensors.Index, alg::Truncated, χ::Real, t::Real)
     max_occ = ITensors.dim(site) - 1
     op = ITensors.ITensor(ComplexF64, site', site)
     @inbounds for n in 0:max_occ
@@ -152,22 +158,23 @@ function kerr(site::ITensors.Index, χ::Real, t::Real)
 end
 
 """
-    harmonic_chain(sites::Vector{<:ITensors.Index}; ω::Real=1.0, J::Real=0.0)
+    harmonic_chain(sites::Vector{<:ITensors.Index}, alg::MabsAlg, ω::Real, J::Real)
 
 Build MPO for a chain of harmonic oscillators with optional nearest-neighbor coupling.
 Here the Hamiltonian is `H = Σᵢ ω*nᵢ + J*Σᵢ (aᵢ†aᵢ₊₁ + aᵢaᵢ₊₁†)`.
 
 Arguments:
 - sites::Vector{<:ITensors.Index}: Vector of bosonic site indices
-- ω::Real: Harmonic oscillator frequency (default: 1.0)
-- J::Real: Nearest-neighbor hopping strength (default: 0.0)
+- alg::MabsAlg: Bosonic MPS algorithm
+- ω::Real: Harmonic oscillator frequency
+- J::Real: Nearest-neighbor hopping strength
 
 Returns:
 - BMPO: Matrix product operator for harmonic chain
 """
-function harmonic_chain(sites::Vector{<:ITensors.Index}; ω::Real=1.0, J::Real=0.0)
+function harmonic_chain(sites::Vector{<:ITensors.Index}, alg::Truncated, ω::Real, J::Real)
     opsum = ITensors.OpSum()
-    @inbounds for i in 1:length(sites)
+    @inbounds for i in eachindex(sites)
         opsum += ω, "N", i
     end
     if J != 0.0
@@ -181,25 +188,24 @@ function harmonic_chain(sites::Vector{<:ITensors.Index}; ω::Real=1.0, J::Real=0
 end
 
 """
-    kerr(sites::Vector{<:ITensors.Index}; ω::Real=1.0, χ::Real=0.1)
+    kerr(sites::Vector{<:ITensors.Index}, alg::MabsAlg, ω::Real, χ::Real)
 
 Build MPO for a chain of Kerr oscillators.
 Here the Hamiltonian is `H = Σᵢ (ω*nᵢ + χ*nᵢ²)`
 
 Arguments:
 - sites::Vector{<:ITensors.Index}: Vector of bosonic site indices
-- ω::Real: Linear frequency (default: 1.0)
-- χ::Real: Kerr nonlinearity strength (default: 0.1)
+- alg::MabsAlg: Bosonic MPS algorithm
+- ω::Real: Linear frequency
+- χ::Real: Kerr nonlinearity strength
 
 Returns:
 - BMPO: Matrix product operator for Kerr chain
 """
-function kerr(sites::Vector{<:ITensors.Index}; ω::Real=1.0, χ::Real=0.1)
+function kerr(sites::Vector{<:ITensors.Index}, alg::Truncated, ω::Real, χ::Real)
     opsum = ITensors.OpSum()
-    @inbounds for i in 1:length(sites)
+    @inbounds for i in eachindex(sites)
         opsum += ω, "N", i
-    end
-    @inbounds for i in 1:length(sites)
         opsum += χ, "N", i, "N", i
     end
     mpo = ITensorMPS.MPO(opsum, sites)

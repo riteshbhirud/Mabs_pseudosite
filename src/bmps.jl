@@ -27,7 +27,7 @@ function BMPS(mps::ITensorMPS.MPS, alg::Truncated)
     return BMPS{typeof(mps), typeof(alg)}(mps, alg)
 end
 
-function BMPS(sites::Vector{<:ITensors.Index}, states::Vector, alg::Truncated)
+function BMPS(sites::Vector{<:ITensors.Index}, alg::Truncated, states::Vector)
     mps = ITensorMPS.productMPS(sites, states)
     return BMPS{typeof(mps), typeof(alg)}(mps, alg)
 end
