@@ -26,7 +26,7 @@ using LinearAlgebra
         @test psi_deepcopy.mps !== psi.mps
     end
     
-    @testset "Product State Construction" begin
+    @testset "Matrix Product State Construction" begin
         N = 3
         max_occ = 4
         sites = ITensors.siteinds("Boson", N; dim=max_occ+1)
@@ -36,7 +36,7 @@ using LinearAlgebra
         @test abs(norm(vac) - 1.0) < 1e-10  
         
         states = [1, 2, 3] 
-        psi = BMPS(sites, states, Truncated())
+        psi = BMPS(sites, Truncated(), states)
         @test length(psi) == N
         @test abs(norm(psi) - 1.0) < 1e-10
     end
@@ -46,7 +46,7 @@ using LinearAlgebra
         site = ITensors.siteinds("Boson", 1; dim=max_occ+1)
         α = 0.5 + 0.3im
         
-        coherent_mps = coherentstate(site, α, Truncated())
+        coherent_mps = coherentstate(site, Truncated(), α)
         @test length(coherent_mps) == 1
         @test abs(norm(coherent_mps) - 1.0) < 1e-8  
     end
@@ -56,17 +56,17 @@ using LinearAlgebra
         sites = ITensors.siteinds("Boson", 1; dim=max_occ+1)
         site = sites[1]
         
-        a_dag = create(site)
-        a = destroy(site)
-        n = number(site)
+        a_dag = create(site, Truncated())
+        a = destroy(site, Truncated())
+        n = number(site, Truncated())
 
         @test a_dag isa ITensors.ITensor
         @test a isa ITensors.ITensor  
         @test n isa ITensors.ITensor
         
         vac = vacuumstate(sites, Truncated())
-        one_photon = BMPS(sites, [2], Truncated()) 
-        two_photon = BMPS(sites, [3], Truncated())  
+        one_photon = BMPS(sites, Truncated(), [2]) 
+        two_photon = BMPS(sites, Truncated(), [3])  
         
         a_dag_vac = ITensors.apply(a_dag, vac.mps)
         normalize!(a_dag_vac)
@@ -88,11 +88,11 @@ using LinearAlgebra
         max_occ = 6
         sites = ITensors.siteinds("Boson", N; dim=max_occ+1)
         
-        H_harmonic = harmonic_chain(sites; ω=1.0, J=0.1)
+        H_harmonic = harmonic_chain(sites, Truncated(), 1.0, 0.1)
         @test H_harmonic isa BMPO{<:ITensorMPS.MPO,Truncated}
         @test length(H_harmonic) == N
         
-        H_kerr = kerr(sites; ω=1.0, χ=0.05)
+        H_kerr = kerr(sites, Truncated(), 1.0, 0.05)
         @test H_kerr isa BMPO{<:ITensorMPS.MPO,Truncated}
         @test length(H_kerr) == N
     end
@@ -184,10 +184,10 @@ using LinearAlgebra
             
             H = BMPO(opsum, sites, Truncated())
             
-            psi = BMPS(sites, [2, 1, 1], Truncated())  
+            psi = BMPS(sites, Truncated(), [2, 1, 1])  
             normalize!(psi)
             
-            expectation_val = real(ITensors.inner(psi.mps, ITensors.Apply(H.mpo, psi.mps)))
+            expectation_val = real(ITensors.inner(psi.mps, ITensors.apply(H.mpo, psi.mps)))
             @test abs(expectation_val - 1.0) < 1e-10
         end
     end
@@ -197,7 +197,7 @@ using LinearAlgebra
         max_occ = 6
         sites = ITensors.siteinds("Boson", N; dim=max_occ+1)
         
-        H = harmonic_chain(sites; ω=1.0, J=0.0)
+        H = harmonic_chain(sites, Truncated(), 1.0, 0.0)
         psi0 = random_bmps(sites, Truncated())
         
         energy, psi_gs = Mabs.dmrg(H, psi0; nsweeps=8, maxdim=100, cutoff=1e-10, noise=1e-11)
@@ -231,7 +231,7 @@ using LinearAlgebra
         max_occ = 4
         sites = ITensors.siteinds("Boson", N; dim=max_occ+1)
         
-        H = harmonic_chain(sites; ω=1.0)
+        H = harmonic_chain(sites, Truncated(), 1.0, 1.0)
         psi0 = random_bmps(sites, Truncated(); linkdims=4)
         normalize!(psi0)
         
@@ -257,30 +257,30 @@ using LinearAlgebra
         @test overlap isa Number
         @test isfinite(overlap)
         
-        H = harmonic_chain(sites; ω=1.0)
+        H = harmonic_chain(sites, Truncated(), 1.0, 1.0)
         normalize!(psi1)
-        expectation_val = real(ITensors.inner(psi1.mps, ITensors.Apply(H.mpo, psi1.mps)))
+        expectation_val = real(ITensors.inner(psi1.mps, ITensors.apply(H.mpo, psi1.mps)))
         @test expectation_val isa Real
         @test isfinite(expectation_val)
     end
     
     @testset "Multi-mode Coherent States" begin
         single_sites = ITensors.siteinds("Boson", 1; dim=7)
-        psi_single = coherentstate(single_sites, 0.5, Truncated())
+        psi_single = coherentstate(single_sites, Truncated(), 0.5)
         @test length(psi_single) == 1
         @test abs(norm(psi_single) - 1.0) < 1e-8
         
         multi_sites = ITensors.siteinds("Boson", 3; dim=7)
-        psi_uniform = coherentstate(multi_sites, 0.3, Truncated())
+        psi_uniform = coherentstate(multi_sites, Truncated(), 0.3)
         @test length(psi_uniform) == 3
         @test abs(norm(psi_uniform) - 1.0) < 1e-8
         
         αs = [0.2, 0.4 + 0.1im, 0.1]
-        psi_mixed = coherentstate(multi_sites, αs, Truncated())
+        psi_mixed = coherentstate(multi_sites, Truncated(), αs)
         @test length(psi_mixed) == 3
         @test abs(norm(psi_mixed) - 1.0) < 1e-8
         
-        @test_throws ErrorException coherentstate(multi_sites, [0.1, 0.2], Truncated())  
+        @test_throws ErrorException coherentstate(multi_sites, Truncated(), [0.1, 0.2])  
     end
 
     @testset "Operator Matrix Elements" begin
@@ -288,12 +288,12 @@ using LinearAlgebra
         sites = ITensors.siteinds("Boson", 1; dim=max_occ+1)
         site = sites[1]
         
-        a_dag = create(site)
-        a = destroy(site)
+        a_dag = create(site, Truncated())
+        a = destroy(site, Truncated())
         
-        state_0 = BMPS(sites, [1], Truncated()) 
-        state_1 = BMPS(sites, [2], Truncated())  
-        state_2 = BMPS(sites, [3], Truncated())  
+        state_0 = BMPS(sites, Truncated(), [1]) 
+        state_1 = BMPS(sites, Truncated(), [2])  
+        state_2 = BMPS(sites, Truncated(), [3])  
         
         result_01 = ITensors.apply(a_dag, state_0.mps)
         overlap_01 = abs(ITensors.inner(state_1.mps, result_01))
@@ -313,7 +313,7 @@ using LinearAlgebra
         sites = ITensors.siteinds("Boson", 1; dim=max_occ+1)
         α = 0.5  
         
-        D = displace(sites[1], α)
+        D = displace(sites[1], Truncated(), α)
         @test D isa ITensors.ITensor
         
         @test ITensors.hasinds(D, sites[1]', sites[1])
@@ -345,7 +345,7 @@ using LinearAlgebra
             @testset "Evolution preserves normalization" begin
                 psi = random_bmps(sites, Truncated(); linkdims=2)
                 normalize!(psi)
-                n_op = number(sites[1])
+                n_op = number(sites[1], Truncated())
                 dt = 0.01
                 gate = exp(-1im * dt * n_op)
                 
@@ -539,7 +539,7 @@ using LinearAlgebra
     
         @testset "Squeeze operator" begin
             ξ = 0.5
-            S = squeeze(site, ξ)
+            S = squeeze(site, Truncated(), ξ)
             @test S isa ITensors.ITensor
             @test ITensors.hasinds(S, site', site)
             
@@ -551,7 +551,7 @@ using LinearAlgebra
         @testset "Kerr single-site operator" begin
             χ = 0.1
             t = 0.5
-            K = kerr(site, χ, t)
+            K = kerr(site, Truncated(), χ, t)
             @test K isa ITensors.ITensor
             @test ITensors.hasinds(K, site', site)
             
@@ -592,7 +592,7 @@ using LinearAlgebra
             
             gates = ITensors.ITensor[]
             for i in 1:N
-                n_op = number(sites[i])
+                n_op = number(sites[i], Truncated())
                 gate = exp(-1im * 0.01 * n_op)
                 push!(gates, gate)
             end
@@ -611,7 +611,7 @@ using LinearAlgebra
         end
         
         @testset "TDVP with parameters" begin
-            H = harmonic_chain(sites; ω=1.0)
+            H = harmonic_chain(sites, Truncated(), 1.0, 1.0)
             psi = random_bmps(sites, Truncated(); linkdims=4)
             normalize!(psi)
             
@@ -634,11 +634,11 @@ using LinearAlgebra
         end
         
         @testset "Invalid coherent state inputs" begin
-            @test_throws ErrorException coherentstate(sites1, [0.1], Truncated())
+            @test_throws ErrorException coherentstate(sites1, Truncated(), [0.1])
         end
         
         @testset "DMRG with incompatible types" begin
-            H1 = harmonic_chain(sites1; ω=1.0)
+            H1 = harmonic_chain(sites1, Truncated(), 1.0, 1.0)
             psi2 = random_bmps(sites2, Truncated())
             
             @test_throws Exception dmrg(H1, psi2; nsweeps=2)
@@ -649,11 +649,11 @@ using LinearAlgebra
         max_occ = 10
         sites = ITensors.siteinds("Boson", 1; dim=max_occ+1)
         site = sites[1]
-        a = destroy(site)
-        a_dag = create(site)
+        a = destroy(site, Truncated())
+        a_dag = create(site, Truncated())
         @testset "Commutator on Fock states" begin
             for n in 0:5
-                psi_n = BMPS(sites, [n+1], Truncated())
+                psi_n = BMPS(sites, Truncated(), [n+1])
             
                 adag_a_psi = ITensors.apply(a, psi_n.mps)
                 adag_a_psi = ITensors.apply(a_dag, adag_a_psi)
@@ -672,8 +672,8 @@ using LinearAlgebra
         
         @testset "Number operator relation" begin
             for n in 0:5
-                psi_n = BMPS(sites, [n+1], Truncated())
-                n_op = number(site)
+                psi_n = BMPS(sites, Truncated(), [n+1])
+                n_op = number(site, Truncated())
                 n_psi = ITensors.apply(n_op, psi_n.mps)
                 n_exp = real(ITensors.inner(psi_n.mps, n_psi))
                 adag_a_psi = ITensors.apply(a, psi_n.mps)
@@ -689,7 +689,7 @@ using LinearAlgebra
         sites = ITensors.siteinds("Boson", 1; dim=max_occ+1)
         α = 2.0 + 1.0im
         
-        psi_coherent = coherentstate(sites, α, Truncated())
+        psi_coherent = coherentstate(sites, Truncated(), α)
         
         @testset "Photon number expectation" begin
             n_expectation = real(ITensorMPS.expect(psi_coherent.mps, "N"; sites=1))
@@ -701,11 +701,11 @@ using LinearAlgebra
         end
         
         @testset "Non-zero for all relevant Fock states" begin
-            a_op = destroy(sites[1])
+            a_op = destroy(sites[1], Truncated())
             a_psi = ITensors.apply(a_op, psi_coherent.mps)
             @test norm(a_psi) > 0 
             
-            a_dag_op = create(sites[1])
+            a_dag_op = create(sites[1], Truncated())
             adag_psi = ITensors.apply(a_dag_op, psi_coherent.mps)
             @test norm(adag_psi) > 0  
         end
@@ -716,7 +716,7 @@ using LinearAlgebra
         max_occ = 10
         sites = ITensors.siteinds("Boson", N; dim=max_occ+1)
         ω = 1.0
-        H = harmonic_chain(sites; ω=ω, J=0.0)
+        H = harmonic_chain(sites, Truncated(), ω, 0.0)
         psi0 = random_bmps(sites, Truncated(); linkdims=10)
         
         energy, psi_gs = Mabs.dmrg(H, psi0; nsweeps=20, maxdim=50, cutoff=1e-12)
@@ -730,10 +730,10 @@ using LinearAlgebra
         sites = ITensors.siteinds("Boson", 1; dim=max_occ+1)
         
         @testset "Number operator eigenvalues" begin
-            n_op = number(sites[1])
+            n_op = number(sites[1], Truncated())
             
             for n in 0:5
-                psi_n = BMPS(sites, [n+1], Truncated())
+                psi_n = BMPS(sites, Truncated(), [n+1])
                 n_psi = ITensors.apply(n_op, psi_n.mps)
                 
                 expectation = real(ITensors.inner(psi_n.mps, n_psi))
@@ -742,11 +742,11 @@ using LinearAlgebra
         end
         
         @testset "Ladder operator norms" begin
-            a = destroy(sites[1])
-            a_dag = create(sites[1])
+            a = destroy(sites[1], Truncated())
+            a_dag = create(sites[1], Truncated())
             
             for n in 1:5
-                psi_n = BMPS(sites, [n+1], Truncated())
+                psi_n = BMPS(sites, Truncated(), [n+1])
                 
                 a_psi = ITensors.apply(a, psi_n.mps)
                 @test abs(norm(a_psi) - sqrt(n)) < 1e-10
@@ -766,10 +766,10 @@ using LinearAlgebra
             dt = 0.5
             n = 2
             
-            psi_n = BMPS(sites, [n+1], Truncated())
+            psi_n = BMPS(sites, Truncated(), [n+1])
             normalize!(psi_n)
             
-            n_op = number(sites[1])
+            n_op = number(sites[1], Truncated())
             gate = exp(-1im * dt * ω * n_op)
             
             psi_evolved = tebd(psi_n, gate)
@@ -785,10 +785,10 @@ using LinearAlgebra
         sites = ITensors.siteinds("Boson", 1; dim=max_occ+1)
         
         @testset "Number operator eigenvalues" begin
-            n_op = number(sites[1])
+            n_op = number(sites[1], Truncated())
             
             for n in 0:5
-                psi_n = BMPS(sites, [n+1], Truncated())
+                psi_n = BMPS(sites, Truncated(), [n+1])
                 n_psi = ITensors.apply(n_op, psi_n.mps)
                 
                 expectation = real(ITensors.inner(psi_n.mps, n_psi))
@@ -797,11 +797,11 @@ using LinearAlgebra
         end
         
         @testset "Ladder operator norms" begin
-            a = destroy(sites[1])
-            a_dag = create(sites[1])
+            a = destroy(sites[1], Truncated())
+            a_dag = create(sites[1], Truncated())
             
             for n in 1:5
-                psi_n = BMPS(sites, [n+1], Truncated())
+                psi_n = BMPS(sites, Truncated(), [n+1])
                 
                 a_psi = ITensors.apply(a, psi_n.mps)
                 @test abs(norm(a_psi) - sqrt(n)) < 1e-10
@@ -820,9 +820,9 @@ using LinearAlgebra
             ω = 1.0
             dt = 0.5
             n = 2
-            psi_n = BMPS(sites, [n+1], Truncated())
+            psi_n = BMPS(sites, Truncated(), [n+1])
             normalize!(psi_n)
-            n_op = number(sites[1])
+            n_op = number(sites[1], Truncated())
             gate = exp(-1im * dt * ω * n_op)
             psi_evolved = tebd(psi_n, gate)
             overlap = ITensors.inner(psi_n.mps, psi_evolved.mps)

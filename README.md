@@ -33,6 +33,13 @@ heterodyne
 count (photon counting, maybe there's a better name)
 threshold (zero photons or nonzero photons)
 ```
+Possible backend interface (inspired by Makie.jl themes):
+```
+with_backend(backend) do
+  # insert bosonic simulation
+end
+```
+Possible names for backends could be `GaussianBackend(::SymplecticBasis)` and `MPSBackend(; maxdim, cutoff, nsites)`.
 
 ## References
 

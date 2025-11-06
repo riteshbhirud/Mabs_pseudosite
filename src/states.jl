@@ -29,30 +29,29 @@ Returns:
 """
 function vacuumstate(sites::Vector{<:ITensors.Index}, alg::Truncated)
     states = fill(1, length(sites))
-    return BMPS(sites, states, alg)  
+    return BMPS(sites, alg, states)  
 end
 
 """
-    coherentstate(sites::Vector{<:ITensors.Index}, α::Number, alg::Truncated)
-    coherentstate(sites::Vector{<:ITensors.Index}, αs::Vector{<:Number}, alg::Truncated)
+    coherentstate(sites::Vector{<:ITensors.Index}, alg::Truncated, α::Number)
+    coherentstate(sites::Vector{<:ITensors.Index}, alg::Truncated, αs::Vector{<:Number})
 
 Create an approximate coherent state `BMPS` using truncated expansion.
 
 Arguments:
 - sites::Vector{<:ITensors.Index}: Vector of site indices
-- α::Number: Single coherent state amplitude (applied to all modes)
-- αs::Vector{<:Number}: Vector of coherent state amplitudes (one per mode)
 - alg::Truncated: Algorithm specification
+- α::Union{Number, Vector{<:Number}}: Single coherent state amplitude (applied to all modes),
+  or a vector of coherent state amplitudes (one per mode)
 
 Returns:
 - BMPS: Coherent state bosonic MPS (approximated by truncation)
 """
-function coherentstate(sites::Vector{<:ITensors.Index}, α::Number, alg::Truncated)
+function coherentstate(sites::Vector{<:ITensors.Index}, alg::Truncated, α::Number)
     αs = fill(α, length(sites))
-    return coherentstate(sites, αs, alg)
+    return coherentstate(sites, alg, αs)
 end
-
-function coherentstate(sites::Vector{<:ITensors.Index}, αs::Vector{<:Number}, alg::Truncated)
+function coherentstate(sites::Vector{<:ITensors.Index}, alg::Truncated, αs::Vector{<:Number})
     N = length(sites)
     length(αs) == N || error("Number of amplitudes ($(length(αs))) must match number of sites ($N)")
     tensors = Vector{ITensors.ITensor}(undef, N)
