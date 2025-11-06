@@ -75,8 +75,8 @@ for f in [
     :(Base.length),
     :(Base.size)
 ]
-    @eval ($f)(bmpo::BMPO{<:ITensorMPS.MPO,Truncated}) = ($f)(bmpo.mpo)
-    @eval ($f)(bmpo::BMPO{<:ITensorMPS.MPO,Truncated}, args...; kwargs...) = ($f)(bmpo.mpo, args...; kwargs...)
+    @eval ($f)(bmpo::BMPO{<:ITensorMPS.MPO,<:MabsAlg}) = ($f)(bmpo.mpo)
+    @eval ($f)(bmpo::BMPO{<:ITensorMPS.MPO,<:MabsAlg}, args...; kwargs...) = ($f)(bmpo.mpo, args...; kwargs...)
 end
 for f in [
     :(ITensors.prime),
@@ -85,7 +85,7 @@ for f in [
     :(ITensors.noprime),
     :(ITensors.dag),
 ]
-    @eval ($f)(bmpo::BMPO{<:ITensorMPS.MPO,Truncated}) = BMPO(($f)(bmpo.mpo), bmpo.alg)
+    @eval ($f)(bmpo::BMPO{<:ITensorMPS.MPO,<:MabsAlg}) = BMPO(($f)(bmpo.mpo), bmpo.alg)
 end
 
 function ITensorMPS.truncate(bmpo::BMPO{<:ITensorMPS.MPO,<:MabsAlg}; kwargs...)
@@ -168,10 +168,10 @@ end
 """
     BMPO(mpo::ITensorMPS.MPO, alg::PseudoSite)
 
-Create BMPO from existing MPO using PseudoSite algorithm.
+Create BMPO from existing MPO using the pseudo-site algorithm.
 """
 function BMPO(mpo::ITensorMPS.MPO, alg::PseudoSite)
-    n_expected = alg.n_modes * n_qubits_per_mode(alg)
+    n_expected = alg.nmodes * _nqubits_per_mode(mpo, alg)
     length(mpo) == n_expected || 
         throw(ArgumentError("MPO length $(length(mpo)) doesn't match expected $n_expected"))
     
@@ -181,18 +181,17 @@ end
 """
     BMPO(opsum::ITensors.OpSum, sites::Vector{<:ITensors.Index}, alg::PseudoSite)
 
-Create BMPO from OpSum using PseudoSite algorithm.
+Create BMPO from OpSum using the pseudo-site algorithm.
 
 NOTE: Only supports simple single-mode operators (N, Id).
 Multi-site operators (Adag, A) are not yet supported via OpSum.
 Use explicit operator construction instead.
 """
 function BMPO(opsum::ITensors.OpSum, sites::Vector{<:ITensors.Index}, alg::PseudoSite)
-    n_expected = alg.n_modes * n_qubits_per_mode(alg)
+    n_expected = alg.n_modes * _nqubits_per_mode(alg)
     length(sites) == n_expected || 
         throw(ArgumentError("Sites length $(length(sites)) must match expected $n_expected"))
-    
-    quantics_opsum = _convert_opsum_to_quantics(opsum, alg)
+    qubit_opsum = _qubit_opsum(opsum, sites, alg)
     mpo = ITensorMPS.MPO(quantics_opsum, sites)
     return BMPO{typeof(mpo), typeof(alg)}(mpo, alg)
 end
@@ -201,23 +200,24 @@ end
     _convert_opsum_to_quantics(opsum::ITensors.OpSum, alg::PseudoSite)
 
 Convert bosonic OpSum to quantics OpSum.
-Currently supports: N (number), Id (identity)
+Currently supports: `N` (number operator), `Id` (identity operator)
 """
-function _convert_opsum_to_quantics(opsum::ITensors.OpSum, alg::PseudoSite)
-    quantics_opsum = ITensors.OpSum()
+function _qubit_opsum(
+    opsum::ITensors.OpSum, sites::Vector{<:ITensors.Index}, alg::PseudoSite
+)
+    qubit_opsum = ITensors.OpSum()
     opsum_terms = opsum.data
-    n_qubits = n_qubits_per_mode(alg)
-    
-    for term in opsum_terms
+    nqubits = _nqubits_per_mode(sites, alg)
+    @inbounds for term in opsum_terms
         coeff = term.coef
         ops = term.ops
         sites_in_term = term.sites
-        for (op_name, site_idx) in zip(ops, sites_in_term)
+        @inbounds for (op_name, site_idx) in zip(ops, sites_in_term)
             if op_name == "N"
-                for i in 1:n_qubits
+                @inbounds for i in 1:nqubits
                     weight = coeff * 2^(i-1)
-                    global_qubit_idx = (site_idx - 1) * n_qubits + i
-                    quantics_opsum += weight, "N", global_qubit_idx
+                    global_qubit_idx = (site_idx - 1) * nqubits + i
+                    qubit_opsum += weight, "N", global_qubit_idx
                 end
             elseif op_name == "Id"
                 continue
@@ -228,31 +228,5 @@ function _convert_opsum_to_quantics(opsum::ITensors.OpSum, alg::PseudoSite)
             end
         end
     end
-    
-    return quantics_opsum
-end
-for f in [
-    :(ITensorMPS.findsite),
-    :(ITensorMPS.findsites),
-    :(ITensorMPS.firstsiteinds),
-    :(ITensorMPS.expect),
-    :(LinearAlgebra.norm),
-    :(ITensorMPS.lognorm),
-    :(Base.collect),
-    :(Base.length),
-    :(Base.size)
-]
-    @eval ($f)(bmpo::BMPO{<:ITensorMPS.MPO,<:PseudoSite}) = ($f)(bmpo.mpo)
-    @eval ($f)(bmpo::BMPO{<:ITensorMPS.MPO,<:PseudoSite}, args...; kwargs...) = 
-        ($f)(bmpo.mpo, args...; kwargs...)
-end
-
-for f in [
-    :(ITensors.prime),
-    :(ITensors.swapprime),
-    :(ITensors.setprime),
-    :(ITensors.noprime),
-    :(ITensors.dag)
-]
-    @eval ($f)(bmpo::BMPO{<:ITensorMPS.MPO,<:PseudoSite}) = BMPO(($f)(bmpo.mpo), bmpo.alg)
+    return qubit_opsum
 end

@@ -50,8 +50,8 @@ for f in [
     :(Base.length),
     :(Base.size)
 ]
-    @eval ($f)(bmps::BMPS{<:ITensorMPS.MPS,Truncated}) = ($f)(bmps.mps)
-    @eval ($f)(bmps::BMPS{<:ITensorMPS.MPS,Truncated}, args...; kwargs...) = ($f)(bmps.mps, args...; kwargs...)
+    @eval ($f)(bmps::BMPS{<:ITensorMPS.MPS,<:MabsAlg}) = ($f)(bmps.mps)
+    @eval ($f)(bmps::BMPS{<:ITensorMPS.MPS,<:MabsAlg}, args...; kwargs...) = ($f)(bmps.mps, args...; kwargs...)
 end
 for f in [
     :(ITensors.prime),
@@ -60,7 +60,7 @@ for f in [
     :(ITensors.noprime),
     :(ITensors.dag)
 ]
-    @eval ($f)(bmps::BMPS{<:ITensorMPS.MPS,Truncated}) = BMPS(($f)(bmps.mps), bmps.alg)
+    @eval ($f)(bmps::BMPS{<:ITensorMPS.MPS,<:MabsAlg}) = BMPS(($f)(bmps.mps), bmps.alg)
 end
 
 
@@ -156,7 +156,7 @@ end
 Create BMPS from existing MPS using PseudoSite algorithm.
 """
 function BMPS(mps::ITensorMPS.MPS, alg::PseudoSite)
-    n_expected = alg.n_modes * n_qubits_per_mode(alg)
+    n_expected = alg.n_modes * _nqubits_per_mode(mps, alg)
     length(mps) == n_expected || 
         throw(ArgumentError("MPS length $(length(mps)) doesn't match expected $n_expected"))
     
@@ -166,57 +166,32 @@ end
 """
     BMPS(sites::Vector{<:ITensors.Index}, states::Vector, alg::PseudoSite)
 
-Create product state BMPS in PseudoSite representation.
+Create a bosonic matrix product state in the pseudo-site representation.
 
 Arguments:
-- sites::Vector{ITensors.Index}: Should be alg.sites
+- sites::Vector{ITensors.Index}: Qubit site indices
 - states::Vector: Bosonic occupation numbers for each mode
 - alg::PseudoSite: Algorithm specification
 
 Returns:
-- BMPS: Product state in quantics representation
+- BMPS: Product state in the pseudo-site representation
 """
 function BMPS(sites::Vector{<:ITensors.Index}, states::Vector, alg::PseudoSite)
-    n_expected = alg.n_modes * n_qubits_per_mode(alg)
+    nqubits = _nqubits_per_mode(sites, alg)
+    n_expected = alg.nmodes * nqubits
     length(sites) == n_expected || 
         throw(ArgumentError("Sites length $(length(sites)) must match expected $n_expected"))
-    length(states) == alg.n_modes || 
-        throw(ArgumentError("Number of states $(length(states)) must match modes $(alg.n_modes))"))
-    n_qubits = n_qubits_per_mode(alg)
+    length(states) == alg.nmodes || 
+        throw(ArgumentError("Number of states $(length(states)) must match modes $(alg.nmodes))"))
     qubit_states = Vector{Int}(undef, n_expected) 
     idx = 1
-    for (mode_idx, n) in enumerate(states)
-        n <= alg.fock_cutoff || 
-            throw(ArgumentError("State $n exceeds maximum $(alg.fock_cutoff)"))
-        qubit_state = Mabs.fock_to_qubit_state(n, n_qubits)
-        copyto!(qubit_states, idx, qubit_state, 1, n_qubits)
-        idx += n_qubits
+    @inbounds for (mode_idx, n) in enumerate(states)
+        n <= 2^nqubits - 1 || 
+            throw(ArgumentError("State $n exceeds maximum $(2^nqubits - 1)"))
+        qubit_state = Mabs._fock_to_qubit(n, nqubits)
+        copyto!(qubit_states, idx, qubit_state, 1, nqubits)
+        idx += nqubits
     end
     mps = ITensorMPS.productMPS(sites, qubit_states)
     return BMPS{typeof(mps), typeof(alg)}(mps, alg)
-end
-for f in [
-    :(ITensorMPS.findsite),
-    :(ITensorMPS.findsites),
-    :(ITensorMPS.firstsiteinds),
-    :(ITensorMPS.expect),
-    :(LinearAlgebra.norm),
-    :(ITensorMPS.lognorm),
-    :(Base.collect),
-    :(Base.length),
-    :(Base.size)
-]
-    @eval ($f)(bmps::BMPS{<:ITensorMPS.MPS,<:PseudoSite}) = ($f)(bmps.mps)
-    @eval ($f)(bmps::BMPS{<:ITensorMPS.MPS,<:PseudoSite}, args...; kwargs...) = 
-        ($f)(bmps.mps, args...; kwargs...)
-end
-
-for f in [
-    :(ITensors.prime),
-    :(ITensors.swapprime),
-    :(ITensors.setprime),
-    :(ITensors.noprime),
-    :(ITensors.dag)
-]
-    @eval ($f)(bmps::BMPS{<:ITensorMPS.MPS,<:PseudoSite}) = BMPS(($f)(bmps.mps), bmps.alg)
 end

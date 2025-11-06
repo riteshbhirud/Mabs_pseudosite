@@ -1,54 +1,34 @@
 """
     PseudoSite <: MabsAlg
+    PseudoSite(nmodes::Int)
 
-Algorithm for representing bosonic systems using quantics (binary) mapping.
-Maps a bosonic Hilbert space of dimension 2^N to N qubits per mode.
+Algorithm for representing bosonic systems using a binary mapping.
+Maps a bosonic Hilbert space of dimension `2^N` to `N` qubits per mode.
 
 Fields:
-- n_modes::Int: Number of bosonic modes
-- fock_cutoff::Int: Maximum occupation in bosonic space (must be 2^N - 1)
+- nmodes::Int: Number of bosonic modes
 
 The quantics mapping represents occupation number states in binary:
-|n⟩ → |b_{N-1}⟩⊗|b_{N-2}⟩⊗...⊗|b_0⟩ where n = Σᵢ bᵢ × 2^i
-
-# Constructors
-
-# PseudoSite(n_modes::Int, fock_cutoff::Int)
-Create algorithm by specifying number of modes and Fock space cutoff.
-Use with `create_qubit_sites(alg)` to generate standard qubit indices.
-
-# PseudoSite(sites::Vector{ITensors.Index}, fock_cutoff::Int)
-Create algorithm from user-provided qubit sites.
-Number of modes is automatically inferred from site count.
+`|n⟩ → |bₙ₋₁⟩⊗|bₙ₋₂⟩⊗...⊗|b₀⟩` where `n = Σᵢ bᵢ × 2^i`.
 
 # Examples
 
-    # Option 1: Standard usage (let Mabs create sites)
-    alg = PseudoSite(2, 7)
-    sites = create_qubit_sites(alg)
-    psi = random_bmps(sites, alg)
-
-    # Option 2: Custom sites (user provides sites)
-    my_sites = [ITensors.Index(2, "Q,n=\$i") for i in 1:6]
-    alg = PseudoSite(my_sites, 7)  # 2 modes inferred
-    psi = random_bmps(my_sites, alg)
+```julia
+alg = PseudoSite(2) # of bosonic modes
+N = 4
+sites = ITensorMPS.siteinds("Qubit", 2^N - 1)
+psi = random_bmps(sites, alg)
+```
 """
 struct PseudoSite <: MabsAlg 
-    n_modes::Int
-    fock_cutoff::Int
-    
-    function PseudoSite(n_modes::Int, fock_cutoff::Int)
-        N = log2(fock_cutoff + 1)
-        isinteger(N) || throw(ArgumentError(PSEUDOSITE_ERROR))
-        
-        return new(n_modes, fock_cutoff)
-    end
+    nmodes::Int
 end
 
+#=
 """
-    PseudoSite(sites::Vector{ITensors.Index}, fock_cutoff::Int)
+    PseudoSite(sites::Vector{ITensors.Index})
 
-Create PseudoSite algorithm from user-provided qubit sites.
+Create PseudoSite algorithm from a vector qubit site indices.
 The number of modes is inferred from: n_modes = length(sites) / log₂(fock_cutoff + 1)
 
 Arguments:
@@ -84,24 +64,29 @@ function PseudoSite(sites::Vector{<:ITensors.Index}, fock_cutoff::Int)
     
     return PseudoSite(n_modes, fock_cutoff)
 end
+=#
+
 
 """
-    n_qubits_per_mode(alg::PseudoSite)
+    _nqubits_per_mode(mps::ITensorMPS.MPS, alg::PseudoSite)
+    _nqubits_per_mode(sites::Vector{<:ITensors.Index}, alg::PseudoSite)
 
-Get number of qubits needed per mode: log₂(fock_cutoff + 1)
+Get number of qubits per mode in the pseudo-site algorithm.
 """
-n_qubits_per_mode(alg::PseudoSite) = Int(log2(alg.fock_cutoff + 1))
+_nqubits_per_mode(mps::ITensorMPS.MPS, alg::PseudoSite) = Int(length(mps) / alg.nmodes)
+_nqubits_per_mode(sites::Vector{<:ITensors.Index}, alg::PseudoSite) = Int(length(sites) / alg.nmodes)
 
+#=
 """
-    create_qubit_sites(alg::PseudoSite)
+    qubitsites(alg::PseudoSite, )
 
 Generate qubit sites for PseudoSite algorithm.
-Creates n_modes × n_qubits_per_mode qubit indices.
+Creates `nmodes` × n_qubits_per_mode qubit indices.
 
 Returns:
 - Vector{ITensors.Index}: Qubit sites for the system
 """
-function create_qubit_sites(alg::PseudoSite)
+function qubitsites(alg::PseudoSite)
     n_qubits = n_qubits_per_mode(alg)
     n_total = alg.n_modes * n_qubits
     sites = Vector{ITensors.Index}(undef, n_total)
@@ -117,76 +102,72 @@ function create_qubit_sites(alg::PseudoSite)
     
     return sites
 end
+=#
 
-function Base.:(==)(alg1::PseudoSite, alg2::PseudoSite)
-    return alg1.n_modes == alg2.n_modes &&
-           alg1.fock_cutoff == alg2.fock_cutoff
-end
+Base.:(==)(alg1::PseudoSite, alg2::PseudoSite) = alg1.nmodes == alg2.nmodes
 
 """
-    _get_mode_cluster(sites::Vector{<:ITensors.Index}, alg::PseudoSite, mode::Int)
+    _mode_cluster(sites::Vector{<:ITensors.Index}, alg::PseudoSite, mode::Int)
 
 Get the qubit cluster indices for a specific bosonic mode.
 
 Arguments:
 - sites::Vector{ITensors.Index}: Qubit sites for the system
 - alg::PseudoSite: Algorithm specification
-- mode::Int: Mode number (1-indexed)
+- mode::Int: Mode number
 
 Returns:
 - Vector{ITensors.Index}: Qubit sites for this mode
 """
-function _get_mode_cluster(sites::Vector{<:ITensors.Index}, alg::PseudoSite, mode::Int)
-    (mode < 1 || mode > alg.n_modes) && 
-        throw(ArgumentError("Mode $mode out of range [1, $(alg.n_modes)]"))
-    
-    n_qubits = n_qubits_per_mode(alg)
-    start_idx = (mode - 1) * n_qubits + 1
-    end_idx = mode * n_qubits
-    
+function _mode_cluster(sites::Vector{<:ITensors.Index}, alg::PseudoSite, mode::Int)
+    (mode < 1 || mode > alg.nmodes) && 
+        throw(ArgumentError("Mode $mode out of range [1, $(alg.nmodes)]"))
+    nqubits = _nqubits_per_mode(sites, alg)
+    start_idx = (mode - 1) * nqubits + 1
+    end_idx = mode * nqubits
     return sites[start_idx:end_idx]
 end
 
 """
-    get_mode_indices(alg::PseudoSite, mode::Int)
+    _mode_indices(alg::PseudoSite, mode::Int)
 
 Get the position indices in MPS for a specific mode's qubit cluster.
 
 Arguments:
 - alg::PseudoSite: Algorithm specification
-- mode::Int: Mode number (1-indexed)
+- mode::Int: Mode number
 
 Returns:
 - UnitRange{Int}: Position indices for this mode's qubits
 """
-function get_mode_indices(alg::PseudoSite, mode::Int)
-    (mode < 1 || mode > alg.n_modes) && 
-        throw(ArgumentError("Mode $mode out of range [1, $(alg.n_modes)]"))
+function _mode_indices(sites::Vector{<:ITensors.Index}, alg::PseudoSite, mode::Int)
+    (mode < 1 || mode > alg.nmodes) && 
+        throw(ArgumentError("Mode $mode out of range [1, $(alg.nmodes)]"))
     
-    n_qubits = n_qubits_per_mode(alg)
-    start_idx = (mode - 1) * n_qubits + 1
-    end_idx = mode * n_qubits
+    nqubits = _nqubits_per_mode(sites, alg)
+    start_idx = (mode - 1) * nqubits + 1
+    end_idx = mode * nqubits
     
     return start_idx:end_idx
 end
 
 """
-    fock_to_qubit_state(n::Int, n_qubits::Int)
+    _fock_to_qubit(n::Int, nqubits::Int)
 
 Convert decimal occupation number to binary state vector.
 
 Arguments:
 - n::Int: Occupation number
-- n_qubits::Int: Number of qubits
+- nqubits::Int: Number of qubits
 
 Returns:
-- Vector{Int}: Binary representation [b_0, b_1, ..., b_{N-1}] where bᵢ ∈ {1,2} (ITensor convention)
+- Vector{Int}: Binary representation `[b₀, b₁, ..., bₙ₋₁]` where `bᵢ ∈ {1,2}` (ITensor convention)
 """
-function fock_to_qubit_state(n::Int, n_qubits::Int)
+function _fock_to_qubit(n::Int, nqubits::Int)
     n >= 0 || throw(ArgumentError("Occupation number must be non-negative"))
-    n < 2^n_qubits || throw(ArgumentError("Occupation $n exceeds max for $n_qubits qubits"))
-    binary_state = Vector{Int}(undef, n_qubits)
-    for i in 1:n_qubits
+    n < 2^nqubits || throw(ArgumentError("Occupation $n exceeds max for $nqubits qubits"))
+    binary_state = Vector{Int}(undef, nqubits)
+    @inbounds for i in 1:nqubits
         bit = (n >> (i-1)) & 1  
         binary_state[i] = bit + 1  
     end
@@ -194,17 +175,17 @@ function fock_to_qubit_state(n::Int, n_qubits::Int)
 end
 
 """
-    qubit_state_to_fock(binary_state::Vector{Int})
+    _qubit_to_fock(binary_state::Vector{Int})
 
 Convert binary state vector to decimal occupation number.
 
 Arguments:
-- binary_state::Vector{Int}: Binary state [b_0, b_1, ..., b_{N-1}] where bᵢ ∈ {1,2}
+- binary_state::Vector{Int}: Binary state `[b₀, b₁, ..., bₙ₋₁]` where `bᵢ ∈ {1,2}`
 
 Returns:
-- Int: Occupation number n = Σᵢ (bᵢ - 1) × 2^(i-1)
+- Int: Occupation number `n = Σᵢ (bᵢ - 1) × 2^(i-1)`
 """
-function qubit_state_to_fock(binary_state::Vector{Int})
+function _qubit_to_fock(binary_state::Vector{Int})
     n = 0
     for (i, bit) in enumerate(binary_state)
         (bit == 1 || bit == 2) || throw(ArgumentError("Binary state values must be 1 or 2"))
