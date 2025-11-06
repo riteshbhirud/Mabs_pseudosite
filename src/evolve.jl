@@ -41,8 +41,6 @@ Arguments:
 - psi::BMPS: Input bosonic MPS
 - H::BMPO: Hamiltonian as bosonic MPO
 - dt::Number: Time step
-  - For imaginary time evolution (ground state search): use imaginary dt (e.g., -1im * 0.1)
-  - For real time evolution (quantum dynamics): use real dt (e.g., 0.1)
 
 Keyword Arguments:
 - kwargs...: All keyword arguments are passed directly to `ITensorMPS.tdvp`
@@ -54,19 +52,6 @@ Keyword Arguments:
 
 Returns:
 - BMPS: Evolved bosonic MPS
-
-# Examples
-
-    H = harmonic_chain(sites; ω=1.0, J=0.5)
-    psi = random_bmps(sites, Truncated())
-    
-    for i in 1:100
-        psi = tdvp(psi, H, -1im * 0.1; nsweeps=2, cutoff=1e-10)
-    end
-    
-    psi_t = tdvp(psi, H, 0.1; nsweeps=1, cutoff=1e-10)
-    
-    energy, psi_gs = dmrg(H, psi; nsweeps=10)
 """
 function tdvp(
     psi::BMPS{<:ITensorMPS.MPS,<:MabsAlg}, 
