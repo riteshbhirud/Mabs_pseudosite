@@ -79,7 +79,7 @@ end
 """
     _number_qubit(cluster_sites::Vector{<:ITensors.Index})
 
-Create number operator in quantics representation.
+Create number operator in the pseudo-site representation.
 
 Arguments:
 - cluster_sites::Vector{<:ITensors.Index}: Qubit sites for one mode
@@ -100,7 +100,7 @@ end
 """
     _create_qubit(cluster_sites::Vector{<:ITensors.Index})
 
-Create bosonic creation operator in quantics representation.
+Create bosonic creation operator in the pseudo-site representation.
 
 Arguments:
 - cluster_sites::Vector{<:ITensors.Index}: Qubit sites for one mode
@@ -121,7 +121,7 @@ end
 """
     _destroy_qubit(cluster_sites::Vector{<:ITensors.Index})
 
-Create bosonic annihilation operator in quantics representation.
+Create bosonic annihilation operator in the pseudo-site representation.
 
 Arguments:
 - cluster_sites::Vector{<:ITensors.Index}: Qubit sites for one mode
@@ -142,7 +142,7 @@ end
 """
     _displace_qubit(cluster_sites::Vector{<:ITensors.Index}, α::Number)
 
-Create displacement operator in quantics representation.
+Create displacement operator in the pseudo-site representation.
 D(α) = exp(α*a† - α*a)
 
 Arguments:
@@ -192,7 +192,7 @@ end
 """
     _squeeze_qubit(cluster_sites::Vector{<:ITensors.Index}, ξ::Number)
 
-Create squeezing operator in quantics representation.
+Create squeezing operator in the pseudo-site representation.
 S(ξ) = exp(0.5*(ξ*a†² - ξ*a²))
 
 Arguments:
@@ -249,7 +249,7 @@ end
 """
     _kerr_qubit(cluster_sites::Vector{<:ITensors.Index}, χ::Real, t::Real)
 
-Create Kerr evolution operator in quantics representation.
+Create Kerr evolution operator in the pseudo-site representation.
 K(χ,t) = exp(-i*χ*t*n²)
 
 Arguments:
@@ -285,8 +285,8 @@ Returns:
 function expect_photon_number(psi::BMPS{<:ITensorMPS.MPS,<:PseudoSite}, mode::Int)
     alg = psi.alg
     sites = ITensorMPS.siteinds(psi.mps)
-    cluster_sites = _get_mode_cluster(sites, alg, mode)
-    n_op = _number_op_quantics(cluster_sites)
+    cluster_sites = _mode_cluster(sites, alg, mode)
+    n_op = _number_qubit(cluster_sites)
     n_psi = ITensors.apply(n_op, psi.mps)
     return real(ITensorMPS.inner(psi.mps, n_psi))
 end

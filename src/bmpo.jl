@@ -192,14 +192,14 @@ function BMPO(opsum::ITensors.OpSum, sites::Vector{<:ITensors.Index}, alg::Pseud
     length(sites) == n_expected || 
         throw(ArgumentError("Sites length $(length(sites)) must match expected $n_expected"))
     qubit_opsum = _qubit_opsum(opsum, sites, alg)
-    mpo = ITensorMPS.MPO(quantics_opsum, sites)
+    mpo = ITensorMPS.MPO(qubit_opsum, sites)
     return BMPO{typeof(mpo), typeof(alg)}(mpo, alg)
 end
 
 """
-    _convert_opsum_to_quantics(opsum::ITensors.OpSum, alg::PseudoSite)
+    _qubit_opsum(opsum::ITensors.OpSum, alg::PseudoSite)
 
-Convert bosonic OpSum to quantics OpSum.
+Convert bosonic OpSum to a qubit OpSum.
 Currently supports: `N` (number operator), `Id` (identity operator)
 """
 function _qubit_opsum(
@@ -224,7 +224,7 @@ function _qubit_opsum(
             else
                 error("Operator '$op_name' not supported in PseudoSite OpSum. " *
                       "Supported: N, Id. " *
-                      "For other operators, construct them explicitly using quantics functions.")
+                      "For other operators, construct them explicitly using qubit maps.")
             end
         end
     end

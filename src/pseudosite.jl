@@ -8,7 +8,7 @@ Maps a bosonic Hilbert space of dimension `2^N` to `N` qubits per mode.
 Fields:
 - nmodes::Int: Number of bosonic modes
 
-The quantics mapping represents occupation number states in binary:
+The qubit mapping represents occupation number states in binary:
 `|n⟩ → |bₙ₋₁⟩⊗|bₙ₋₂⟩⊗...⊗|b₀⟩` where `n = Σᵢ bᵢ × 2^i`.
 
 # Examples
