@@ -21,7 +21,6 @@ export create, destroy, number,
        displace, squeeze, kerr,
        harmonic_chain,
        add
-export n_qubits_per_mode, create_qubit_sites
 
 include("algs.jl")
 include("throws.jl")
