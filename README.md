@@ -39,7 +39,7 @@ with_backend(backend) do
   # insert bosonic simulation
 end
 ```
-Possible names for backends could be `GaussianBackend(::SymplecticBasis)` and `MPSBackend(; maxdim, cutoff, nsites)`.
+Possible names for backends could be `GaussianBackend(::SymplecticBasis)` and `MPSBackend(; alg, maxdim, cutoff, nsites)`.
 
 ## References
 
