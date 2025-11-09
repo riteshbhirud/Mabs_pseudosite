@@ -25,11 +25,13 @@ export create, destroy, number,
 include("algs.jl")
 include("throws.jl")
 include("truncated.jl")
+include("pseudosite.jl")  
+include("localbasis.jl")
 include("bmps.jl")
 include("bmpo.jl")
+include("qubit_maps.jl")  
 include("operators.jl")
 include("states.jl")
 include("dmrg.jl")
 include("evolve.jl")
-
 end

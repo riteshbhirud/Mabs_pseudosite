@@ -122,7 +122,7 @@ function squeeze(site::ITensors.Index, alg::Truncated, ξ::Number)
                            (_safe_factorial(k) * _safe_factorial((n-2k)) * _safe_factorial((m-2k)))
                     coeff *= (-0.5 * tanh(r) * exp(2im*φ))^k / sqrt(cosh(r))
                     if n == m && k == 0
-                        coeff /= sqrt(cosh(r))  #.. additional factor for diagonal terms
+                        coeff /= sqrt(cosh(r))  
                     end
                     element += coeff
                 end
@@ -211,4 +211,206 @@ function kerr(sites::Vector{<:ITensors.Index}, alg::Truncated, ω::Real, χ::Rea
     mpo = ITensorMPS.MPO(opsum, sites)
 
     return BMPO(mpo, Truncated())
+end
+
+"""
+    create(sites::Vector{<:ITensors.Index}, alg::PseudoSite, mode::Int)
+
+Create bosonic creation operator for a specific mode in the pseudo-site representation.
+
+Arguments:
+- sites::Vector{<:ITensors.Index}: All qubit site indices for the system
+- alg::PseudoSite: Algorithm specification
+- mode::Int: Bosonic mode index (`1` to `nmodes`)
+
+Returns:
+- ITensors.ITensor: Creation operator `â†` for the specified mode
+"""
+function create(sites::Vector{<:ITensors.Index}, alg::PseudoSite, mode::Int)
+    cluster_sites = _mode_cluster(sites, alg, mode)
+    return _create_qubit(cluster_sites)
+end
+
+"""
+    destroy(sites::Vector{<:ITensors.Index}, alg::PseudoSite, mode::Int)
+
+Create bosonic annihilation operator for a specific mode in the pseudo-site representation.
+
+Arguments:
+- sites::Vector{<:ITensors.Index}: All qubit site indices for the system
+- alg::PseudoSite: Algorithm specification
+- mode::Int: Bosonic mode index (`1` to `nmodes`)
+
+Returns:
+- ITensors.ITensor: Annihilation operator `â` for the specified mode
+"""
+function destroy(sites::Vector{<:ITensors.Index}, alg::PseudoSite, mode::Int)
+    cluster_sites = _mode_cluster(sites, alg, mode)
+    return _destroy_qubit(cluster_sites)
+end
+
+"""
+    number(sites::Vector{<:ITensors.Index}, alg::PseudoSite, mode::Int)
+
+Create bosonic number operator for a specific mode in the pseudo-site representation.
+
+Arguments:
+- sites::Vector{<:ITensors.Index}: All qubit site indices for the system
+- alg::PseudoSite: Algorithm specification
+- mode::Int: Bosonic mode index (`1` to `nmodes`)
+
+Returns:
+- ITensors.ITensor: Number operator `n̂` for the specified mode
+"""
+function number(sites::Vector{<:ITensors.Index}, alg::PseudoSite, mode::Int)
+    cluster_sites = _mode_cluster(sites, alg, mode)
+    return _number_qubit(cluster_sites)
+end
+
+"""
+    displace(sites::Vector{<:ITensors.Index}, alg::PseudoSite, mode::Int, α::Number)
+
+Create displacement operator for a specific mode in the pseudo-site representation..
+
+Arguments:
+- sites::Vector{<:ITensors.Index}: All qubit site indices for the system
+- alg::PseudoSite: Algorithm specification
+- mode::Int: Bosonic mode index (1 to n_modes)
+- α::Number: Displacement amplitude (can be complex)
+
+Returns:
+- ITensors.ITensor: Displacement operator D(α) = exp(α â† - α* â) for the specified mode
+"""
+function displace(
+    sites::Vector{<:ITensors.Index}, alg::PseudoSite, mode::Int, α::Number
+)
+    cluster_sites = _mode_cluster(sites, alg, mode)
+    return _displace_qubit(cluster_sites, α)
+end
+
+"""
+    squeeze(sites::Vector{<:ITensors.Index}, alg::PseudoSite, mode::Int, ξ::Number)
+
+Create squeeze operator for a specific mode in the pseudo-site representation.
+
+Arguments:
+- sites::Vector{<:ITensors.Index}: All qubit site indices for the system
+- alg::PseudoSite: Algorithm specification
+- mode::Int: Bosonic mode index (`1` to `nmodes`)
+- ξ::Number: Squeezing parameter (can be complex)
+
+Returns:
+- ITensors.ITensor: Squeeze operator S(ξ) = exp(½(ξ â†² - ξ* â²)) for the specified mode
+"""
+function squeeze(
+    sites::Vector{<:ITensors.Index}, alg::PseudoSite, mode::Int, ξ::Number
+)
+    cluster_sites = _mode_cluster(sites, alg, mode)
+    return _squeeze_qubit(cluster_sites, ξ)
+end
+
+"""
+    kerr(sites::Vector{<:ITensors.Index}, alg::PseudoSite, mode::Int, χ::Real, t::Real)
+
+Create Kerr evolution operator for a specific mode in the pseudo-site representation.
+
+Arguments:
+- sites::Vector{<:ITensors.Index}: All qubit site indices for the system
+- alg::PseudoSite: Algorithm specification
+- mode::Int: Bosonic mode index (`1` to `nmodes`)
+- χ::Real: Kerr nonlinearity strength
+- t::Real: Evolution time
+
+Returns:
+- ITensors.ITensor: Kerr operator exp(-i χ t n̂²) for the specified mode
+"""
+function kerr(
+    sites::Vector{<:ITensors.Index}, alg::PseudoSite, mode::Int, χ::Real, t::Real
+)
+    cluster_sites = _mode_cluster(sites, alg, mode)
+    return _kerr_qubit(cluster_sites, χ, t)
+end
+
+"""
+    harmonic_chain(sites::Vector{<:ITensors.Index}, alg::PseudoSite; ω::Real=1.0, J::Real=0.0)
+
+Build harmonic chain Hamiltonian in the pseudo-site representation.
+H = Σᵢ ω*nᵢ + J*Σᵢ (aᵢ†aᵢ₊₁ + h.c.)
+"""
+function harmonic_chain(sites::Vector{<:ITensors.Index}, alg::PseudoSite; ω::Real=1.0, J::Real=0.0)
+    nqubits = nqubits_per_mode(sites, alg)
+    n_expected = alg.n_modes * nqubits
+    length(sites) == n_expected || throw(ArgumentError("Sites must match algorithm"))
+    opsum = ITensors.OpSum()
+    @inbounds for mode in 1:alg.nmodes
+        @inbounds for i in 1:nqubits
+            weight = ω * 2^(i-1)
+            global_idx = (mode - 1) * nqubits + i
+            opsum += weight, "N", global_idx
+        end
+    end
+    
+    H = ITensorMPS.MPO(opsum, sites)
+    if J != 0.0
+        @inbounds for mode in 1:(alg.nmodes - 1)
+            H_hop = hopping_mpo(sites, alg, mode, J)
+            # TODO: we shouldn't be determining the cutoff parameter under the hood
+            H = ITensorMPS.add(H, H_hop; cutoff=1e-15)
+        end
+    end
+    return BMPO(H, alg)
+end
+
+"""
+    kerr(sites::Vector{<:ITensors.Index}, alg::PseudoSite; ω::Real=1.0, χ::Real=0.1)
+
+Build Kerr nonlinearity Hamiltonian in the pseudo-site representation.
+H = Σᵢ (ω*nᵢ + χ*nᵢ²)
+"""
+function kerr(sites::Vector{<:ITensors.Index}, alg::PseudoSite; ω::Real=1.0, χ::Real=0.1)
+    nqubits = nqubits_per_mode(sites, alg)
+    n_expected = alg.n_modes * nqubits
+    length(sites) == n_expected || throw(ArgumentError("Sites must match algorithm"))
+    opsum = ITensors.OpSum()
+    @inbounds for mode in 1:alg.nmodes
+        @inbounds for i in 1:nqubits
+            weight = ω * 2^(i-1)
+            global_idx = (mode - 1) * nqubits + i
+            opsum += weight, "N", global_idx
+        end
+        @inbounds for i in 1:nqubits
+            @inbounds for j in 1:nqubits
+                weight = χ * 2^(i + j - 2)
+                idx_i = (mode - 1) * nqubits + i
+                idx_j = (mode - 1) * nqubits + j
+                if i == j
+                    opsum += weight, "N", idx_i
+                else
+                    opsum += weight, "N", idx_i, "N", idx_j
+                end
+            end
+        end
+    end
+    mpo = ITensorMPS.MPO(opsum, sites)
+    return BMPO(mpo, alg)
+end
+
+function ITensors.op(::ITensors.OpName"N", ::ITensors.SiteType"Qubit", s::ITensors.Index)
+    return ITensors.ITensor(ComplexF64[0.0 0.0; 0.0 1.0], s', s)
+end
+
+function ITensors.op(::ITensors.OpName"Id", ::ITensors.SiteType"Qubit", s::ITensors.Index)
+    return ITensors.ITensor(ComplexF64[1.0 0.0; 0.0 1.0], s', s)
+end
+
+function ITensors.op(::ITensors.OpName"X", ::ITensors.SiteType"Qubit", s::ITensors.Index)
+    return ITensors.ITensor(ComplexF64[0.0 1.0; 1.0 0.0], s', s)
+end
+
+function ITensors.op(::ITensors.OpName"Z", ::ITensors.SiteType"Qubit", s::ITensors.Index)
+    return ITensors.ITensor(ComplexF64[1.0 0.0; 0.0 -1.0], s', s)
+end
+
+function ITensors.op(::ITensors.OpName"Y", ::ITensors.SiteType"Qubit", s::ITensors.Index)
+    return ITensors.ITensor(ComplexF64[0.0 -im; im 0.0], s', s)
 end

@@ -1,11 +1,11 @@
 """
-    random_bmps(sites::Vector{<:ITensors.Index}, alg::Truncated; kwargs...)
+    random_bmps(sites::Vector{<:ITensors.Index}, alg::MabsAlg; kwargs...)
 
-Create a random bosonic MPS using the `Truncated` algorithm.
+Create a random bosonic MPS using the bosonic MPS algorithm.
 
 Arguments:
 - sites::Vector{<:ITensors.Index}: Vector of site indices
-- alg::Truncated: Algorithm specification
+- alg::MabsAlg: Algorithm specification
 
 Returns:
 - BMPS: Random bosonic MPS
@@ -14,15 +14,22 @@ function random_bmps(sites::Vector{<:ITensors.Index}, alg::Truncated; linkdims =
     mps = ITensorMPS.random_mps(sites; linkdims)
     return BMPS(mps, alg)
 end
+function random_bmps(sites::Vector{<:ITensors.Index}, alg::PseudoSite; linkdims=1)
+    n_expected = alg.nmodes * _nqubits_per_mode(alg)
+    length(sites) == n_expected || throw(ArgumentError("Sites must match algorithm"))
+    
+    mps = ITensorMPS.random_mps(sites; linkdims=linkdims)
+    return BMPS(mps, alg)
+end
 
 """
-    vacuumstate(sites::Vector{<:ITensors.Index}, alg::Truncated)
+    vacuumstate(sites::Vector{<:ITensors.Index}, alg::MabsAlg)
 
 Create a vacuum state |0,0,...,0⟩ BMPS.
 
 Arguments:
 - sites::Vector{<:ITensors.Index}: Vector of site indices
-- alg::Truncated: Algorithm specification
+- alg::MabsAlg: Algorithm specification
 
 Returns:
 - BMPS: Vacuum state bosonic MPS
@@ -30,6 +37,13 @@ Returns:
 function vacuumstate(sites::Vector{<:ITensors.Index}, alg::Truncated)
     states = fill(1, length(sites))
     return BMPS(sites, alg, states)  
+end
+function vacuumstate(sites::Vector{<:ITensors.Index}, alg::PseudoSite)
+    n_expected = alg.nmodes * _nqubits_per_mode(alg)
+    length(sites) == n_expected || throw(ArgumentError("Sites must match algorithm"))
+    states = fill(1, length(sites))
+    mps = ITensorMPS.productMPS(sites, states) 
+    return BMPS(mps, alg)
 end
 
 """
@@ -97,4 +111,169 @@ function coherentstate(sites::Vector{<:ITensors.Index}, alg::Truncated, αs::Vec
     end
     mps = ITensorMPS.MPS(tensors)
     return BMPS(mps, alg)
+end
+function coherentstate(sites::Vector{<:ITensors.Index}, alg::PseudoSite, α::Number)
+    n_expected = alg.nmodes * _nqubits_per_mode(alg)
+    length(sites) == n_expected || throw(ArgumentError("Sites must match algorithm"))
+    αs = fill(α, alg.nmodes)
+    return coherentstate(sites, alg, αs)
+end
+function coherentstate(sites::Vector{<:ITensors.Index}, alg::PseudoSite, αs::Vector{<:Number})
+    n_expected = alg.nmodes * _nqubits_per_mode(alg)
+    length(sites) == n_expected || throw(ArgumentError("Sites must match algorithm"))
+    length(αs) == alg.nmodes || 
+        throw(ArgumentError("Number of amplitudes must match modes"))
+    if alg.fock_cutoff <= 15
+        return _coherentstate_direct_sum(sites, alg, αs)
+    else
+        return _coherentstate_displace(sites, alg, αs)
+    end
+end
+
+"""
+    _coherentstate_direct_sum(
+        sites::Vector{<:ITensors.Index}, 
+        αs::Vector{<:Number}, 
+        alg::PseudoSite
+    )
+
+Direct summation approach for coherent states in PseudoSite representation.
+Enumerates significant Fock state contributions and sums them as product states.
+
+This approach is efficient for small cutoffs (≤15) where the number of significant
+Fock states is manageable. For larger cutoffs, use displacement operator approach.
+"""
+function _coherentstate_direct_sum(
+    sites::Vector{<:ITensors.Index}, 
+    alg::PseudoSite,
+    αs::Vector{<:Number}
+)
+    n_modes = alg.nmodes
+    nqubits = _nqubits_per_mode(alg)
+    max_occ = 2^nqubits - 1
+    
+    # |α⟩ = exp(-|α|²/2) Σₙ (αⁿ/√n!) |n⟩
+    all_fock_coeffs = [_coherent_fock_coefficients_raw(α, max_occ) for α in αs]
+    
+    # Determine cutoff for significance -- ignore coefficients below this threshold
+    max_coeff = maximum(maximum(abs.(coeffs)) for coeffs in all_fock_coeffs)
+    cutoff = 1e-12 * max_coeff
+    
+    # Storage for significant multi-mode Fock states and their coefficients
+    fock_states_list = Vector{Vector{Int}}()
+    coefficients_list = Vector{ComplexF64}()
+    
+    # Recursively enumerate all significant Fock state combinations
+    function enumerate_states!(current_state::Vector{Int}, mode_idx::Int)
+        if mode_idx > n_modes
+            coeff = ComplexF64(1.0)
+            for m in 1:n_modes
+                coeff *= all_fock_coeffs[m][current_state[m] + 1]
+            end
+            
+            if abs(coeff) >= cutoff
+                push!(fock_states_list, copy(current_state))
+                push!(coefficients_list, coeff)
+            end
+            return
+        end
+        
+        for n in 0:max_occ
+            if abs(all_fock_coeffs[mode_idx][n + 1]) >= cutoff
+                current_state[mode_idx] = n
+                enumerate_states!(current_state, mode_idx + 1)
+            end
+        end
+    end
+    
+    current_state = zeros(Int, n_modes)
+    enumerate_states!(current_state, 1)
+    
+    if isempty(fock_states_list)
+        error("No significant Fock states found - try larger cutoff or displacement method")
+    end
+    
+    # Normalize collected coefficients
+    norm_factor = sqrt(sum(abs2, coefficients_list))
+    coefficients_list ./= norm_factor
+    qubit_states = Vector{Int}(undef, n_modes * nqubits)
+    result_mps = nothing
+    for (fock_state, coeff) in zip(fock_states_list, coefficients_list)
+        idx = 1
+        for mode in 1:n_modes
+            qubit_state = fock_to_qubit_state(fock_state[mode], nqubits)
+            copyto!(qubit_states, idx, qubit_state, 1, nqubits)
+            idx += nqubits
+        end
+        term_mps = ITensorMPS.productMPS(sites, qubit_states)
+        term_mps[1] *= coeff  
+        
+        # Add to accumulating superposition
+        if result_mps === nothing
+            result_mps = term_mps
+        else
+            result_mps = ITensorMPS.add(result_mps, term_mps; cutoff=1e-15)
+        end
+    end
+    ITensorMPS.normalize!(result_mps)
+    return BMPS(result_mps, alg)
+end
+
+"""
+    _coherent_fock_coefficients_raw(α::Number, max_occ::Int)
+
+Compute RAW (unnormalized) Fock state expansion coefficients for coherent state |α⟩.
+Returns: cₙ = exp(-|α|²/2) × α^n / √(n!)
+
+These are NOT individually normalized - the normalization happens after 
+summing all product state contributions.
+"""
+function _coherent_fock_coefficients_raw(α::Number, max_occ::Int)
+    coeffs = zeros(ComplexF64, max_occ + 1)
+    exp_factor = exp(-abs2(α) / 2)
+    
+    for n in 0:max_occ
+        coeffs[n+1] = exp_factor * (α^n) / sqrt(_safe_factorial(n))
+    end    
+    return coeffs
+end
+
+"""
+Displacement operator approach for coherent states.
+More efficient for large Hilbert spaces.
+"""
+function _coherentstate_via_displacement(
+    sites::Vector{<:ITensors.Index},
+    alg::PseudoSite,
+    αs::Vector{<:Number}
+)
+    psi = vacuumstate(sites, alg)
+    @inbounds for mode_idx in 1:alg.nmodes
+        α = αs[mode_idx]
+        if abs(α) > 1e-10  
+            cluster_sites = _mode_cluster(sites, alg, mode_idx)
+            D = _displace_qubit(cluster_sites, α)
+            # TODO: let use specify kwargs here
+            psi.mps = ITensors.apply(D, psi.mps; cutoff=1e-12, maxdim=256)
+        end
+    end    
+    LinearAlgebra.normalize!(psi)
+    return psi
+end
+
+"""
+    _coherent_fock_coefficients(α::Number, max_occ::Int)
+
+Compute Fock state expansion coefficients for coherent state |α⟩.
+Returns normalized coefficients for direct use.
+"""
+function _coherent_fock_coefficients(α::Number, max_occ::Int)
+    coeffs = zeros(ComplexF64, max_occ + 1)
+    exp_factor = exp(-abs2(α) / 2)
+    for n in 0:max_occ
+        coeffs[n+1] = exp_factor * (α^n) / sqrt(_safe_factorial(n))
+    end
+    norm_factor = sqrt(sum(abs2, coeffs))
+    coeffs ./= norm_factor
+    return coeffs
 end

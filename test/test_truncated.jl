@@ -237,7 +237,7 @@ using LinearAlgebra
         
         dt = 0.01
         
-        psi_evolved = Mabs.tdvp(psi0, H, dt; cutoff=1e-8)
+        psi_evolved = Mabs.tdvp(psi0, H, -1im * dt; cutoff=1e-8)
         @test psi_evolved isa BMPS{<:ITensorMPS.MPS,Truncated}
         @test psi_evolved !== psi0
     end

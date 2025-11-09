@@ -1,19 +1,30 @@
 """
-    tebd(psi::BMPS{<:ITensorMPS.MPS,Truncated}, gate::ITensors.ITensor; kwargs...)
-    tebd(psi::BMPS{<:ITensorMPS.MPS,Truncated}, gates::Vector{ITensors.ITensor}; kwargs...)
+    tebd(psi::BMPS, gate::ITensors.ITensor; kwargs...)
+    tebd(psi::BMPS, gates::Vector{ITensors.ITensor}; kwargs...)
 
 Perform time evolution using TEBD algorithm.
+
+Arguments:
+- psi::BMPS: Input bosonic MPS
+- gate/gates: Time evolution gate(s) to apply
+
+Keyword Arguments:
+- kwargs...: Passed directly to `ITensors.apply` (e.g., maxdim, cutoff)
+
+Returns:
+- BMPS: Evolved bosonic MPS
 """
 function tebd(
-    psi::BMPS{<:ITensorMPS.MPS,Truncated}, 
+    psi::BMPS{<:ITensorMPS.MPS,<:MabsAlg}, 
     gate::ITensors.ITensor; 
     kwargs...
 )
     evolved_mps = ITensors.apply(gate, psi.mps; kwargs...)
     return BMPS(evolved_mps, psi.alg)
 end
+
 function tebd(
-    psi::BMPS{<:ITensorMPS.MPS,Truncated}, 
+    psi::BMPS{<:ITensorMPS.MPS,<:MabsAlg}, 
     gates::Vector{ITensors.ITensor}; 
     kwargs...
 )
@@ -22,7 +33,7 @@ function tebd(
 end
 
 """
-    tdvp(psi::BMPS{<:ITensorMPS.MPS,Truncated}, H::BMPO{<:ITensorMPS.MPO,Truncated}, dt::Number; kwargs...)
+    tdvp(psi::BMPS, H::BMPO, dt::Number; kwargs...)
 
 Perform time evolution using Time Dependent Variational Principle (TDVP) algorithm.
 
@@ -32,17 +43,29 @@ Arguments:
 - dt::Number: Time step
 
 Keyword Arguments:
-- kwargs...: Additional parameters passed to `ITensorMPS.tdvp`
+- kwargs...: All keyword arguments are passed directly to `ITensorMPS.tdvp`
+  Common options include:
+  - nsweeps::Int: Number of TDVP sweeps (default depends on ITensorMPS)
+  - cutoff::Float64: Truncation cutoff (default depends on ITensorMPS)
+  - maxdim::Int: Maximum bond dimension (default depends on ITensorMPS)
+  - normalize::Bool: Normalize after evolution (default depends on ITensorMPS)
 
 Returns:
-- BMPS: Time-evolved bosonic MPS
+- BMPS: Evolved bosonic MPS
 """
 function tdvp(
-    psi::BMPS{<:ITensorMPS.MPS,Truncated}, 
-    H::BMPO{<:ITensorMPS.MPO,Truncated}, 
+    psi::BMPS{<:ITensorMPS.MPS,<:MabsAlg}, 
+    H::BMPO{<:ITensorMPS.MPO,<:MabsAlg}, 
     dt::Number; 
     kwargs...
 )
-    evolved_mps = ITensorMPS.tdvp(H.mpo, dt, psi.mps; kwargs...)
+    psi.alg == H.alg || throw(ArgumentError(ALGORITHM_MISMATCH_ERROR))
+    
+    evolved_mps = ITensorMPS.tdvp(
+        H.mpo, 
+        dt,  
+        psi.mps; 
+        kwargs...
+    )
     return BMPS(evolved_mps, psi.alg)
 end

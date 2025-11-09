@@ -44,18 +44,14 @@ for f in [
     :(ITensorMPS.findsites),
     :(ITensorMPS.firstsiteinds),
     :(ITensorMPS.expect),
-    :(ITensorMPS.inner),
-    :(LinearAlgebra.dot),
-    :(ITensorMPS.loginner),
-    :(ITensorMPS.logdot),
     :(LinearAlgebra.norm),
     :(ITensorMPS.lognorm),
     :(Base.collect),
     :(Base.length),
     :(Base.size)
 ]
-    @eval ($f)(bmps::BMPS{<:ITensorMPS.MPS,Truncated}) = ($f)(bmps.mps)
-    @eval ($f)(bmps::BMPS{<:ITensorMPS.MPS,Truncated}, args...; kwargs...) = ($f)(bmps.mps, args...; kwargs...)
+    @eval ($f)(bmps::BMPS{<:ITensorMPS.MPS,<:MabsAlg}) = ($f)(bmps.mps)
+    @eval ($f)(bmps::BMPS{<:ITensorMPS.MPS,<:MabsAlg}, args...; kwargs...) = ($f)(bmps.mps, args...; kwargs...)
 end
 for f in [
     :(ITensors.prime),
@@ -64,7 +60,7 @@ for f in [
     :(ITensors.noprime),
     :(ITensors.dag)
 ]
-    @eval ($f)(bmps::BMPS{<:ITensorMPS.MPS,Truncated}) = BMPS(($f)(bmps.mps), bmps.alg)
+    @eval ($f)(bmps::BMPS{<:ITensorMPS.MPS,<:MabsAlg}) = BMPS(($f)(bmps.mps), bmps.alg)
 end
 
 
@@ -78,181 +74,124 @@ Base.setindex!(bmps::BMPS, val, i) = (bmps.mps[i] = val)
 Base.firstindex(bmps::BMPS) = Base.firstindex(bmps.mps)
 Base.lastindex(bmps::BMPS) = Base.lastindex(bmps.mps)
 
-"""
-    normalize[!](bmps::BMPS{<:ITensorMPS.MPS,Truncated}; (lognorm!)=[])
-
-Normalize the `BMPS` in place such that `norm(bmps) ≈ 1`.
-
-Arguments:
-- bmps::BMPS: Bosonic MPS to normalize
-
-Keyword Arguments:
-- lognorm!=[]: Mutable vector to store the log norm. Pass an empty vector 
-  that will be filled with the log norm value.
-
-Returns:
-- BMPS: The normalized BMPS (same object, modified in place)
-```
-"""
-function LinearAlgebra.normalize!(bmps::BMPS{<:ITensorMPS.MPS,Truncated}; kwargs...)
+function LinearAlgebra.normalize!(bmps::BMPS{<:ITensorMPS.MPS,<:MabsAlg}; kwargs...)
     LinearAlgebra.normalize!(bmps.mps; kwargs...)
     return bmps
 end
-function LinearAlgebra.normalize(bmps::BMPS{<:ITensorMPS.MPS,Truncated}; kwargs...)
+
+function LinearAlgebra.normalize(bmps::BMPS{<:ITensorMPS.MPS,<:MabsAlg}; kwargs...)
     normalized_mps = LinearAlgebra.normalize(bmps.mps; kwargs...)
     return BMPS(normalized_mps, bmps.alg)
 end
 
-"""
-    orthogonalize[!](bmps::BMPS{<:ITensorMPS.MPS,Truncated}, j::Int)
-
-Orthogonalize the `BMPS`` to site j.
-
-Arguments:
-- bmps::BMPS: Bosonic MPS to orthogonalize
-- j::Int: Site to orthogonalize to
-
-Returns:
-- BMPS: The orthogonalized BMPS (same object, modified in place)
-"""
-function ITensorMPS.orthogonalize!(
-    bmps::BMPS{<:ITensorMPS.MPS,Truncated}, 
-    j::Int; 
-    kwargs...
-)
+function ITensorMPS.orthogonalize!(bmps::BMPS{<:ITensorMPS.MPS,<:MabsAlg}, j::Int; kwargs...)
     ITensorMPS.orthogonalize!(bmps.mps, j; kwargs...)
     return bmps
 end
-function ITensorMPS.orthogonalize(
-    bmps::BMPS{<:ITensorMPS.MPS,Truncated}, 
-    j::Int; 
-    kwargs...
-)
+
+function ITensorMPS.orthogonalize(bmps::BMPS{<:ITensorMPS.MPS,<:MabsAlg}, j::Int; kwargs...)
     orthog_mps = ITensorMPS.orthogonalize(bmps.mps, j; kwargs...)
     return BMPS(orthog_mps, bmps.alg)
 end
 
-"""
-    truncate[!](bmps::BMPS{<:ITensorMPS.MPS,Truncated}; kwargs...)
-
-Create a truncated copy of the `BMPS`.
-
-Arguments:
-- bmps::BMPS: Input bosonic MPS
-
-Keyword Arguments:
-- kwargs...: Truncation parameters passed to `ITensorMPS.truncate` 
-  (e.g., `maxdim`, `cutoff`, `alg`)
-
-Returns:
-- BMPS: Truncated bosonic MPS
-"""
-function ITensorMPS.truncate(bmps::BMPS{<:ITensorMPS.MPS,Truncated}; kwargs...)
+function ITensorMPS.truncate(bmps::BMPS{<:ITensorMPS.MPS,<:MabsAlg}; kwargs...)
     truncated_mps = ITensorMPS.truncate(bmps.mps; kwargs...)
     return BMPS(truncated_mps, bmps.alg)
 end
-function ITensorMPS.truncate!(bmps::BMPS{<:ITensorMPS.MPS,Truncated}; kwargs...)
+
+function ITensorMPS.truncate!(bmps::BMPS{<:ITensorMPS.MPS,<:MabsAlg}; kwargs...)
     ITensorMPS.truncate!(bmps.mps; kwargs...)
     return bmps
 end
 
-"""
-    +(bmps1::BMPS{<:ITensorMPS.MPS,Truncated}, bmps2::BMPS{<:ITensorMPS.MPS,Truncated}; kwargs...)
-
-Add two BMPS objects with optional truncation. Can also use `add`.
-
-Arguments:
-- bmps1::BMPS: First bosonic MPS
-- bmps2::BMPS: Second bosonic MPS
-
-Keyword Arguments:
-- kwargs...: Truncation parameters passed to ITensorMPS.truncate (e.g., `maxdim`, `cutoff`)
-
-Returns:
-- BMPS: Sum of the two bosonic MPS
-"""
 function Base.:(+)(
-    bmps1::BMPS{<:ITensorMPS.MPS,Truncated}, 
-    bmps2::BMPS{<:ITensorMPS.MPS,Truncated}; 
+    bmps1::BMPS{<:ITensorMPS.MPS,<:MabsAlg}, 
+    bmps2::BMPS{<:ITensorMPS.MPS,<:MabsAlg}; 
     kwargs...
 )
+    bmps1.alg == bmps2.alg || throw(ArgumentError(ALGORITHM_MISMATCH_ERROR))
     result_mps = Base.:(+)(bmps1.mps, bmps2.mps; kwargs...)
     return BMPS(result_mps, bmps1.alg)
 end
+
 function ITensorMPS.add(
-    bmps1::BMPS{<:ITensorMPS.MPS,Truncated}, 
-    bmps2::BMPS{<:ITensorMPS.MPS,Truncated}; 
+    bmps1::BMPS{<:ITensorMPS.MPS,<:MabsAlg}, 
+    bmps2::BMPS{<:ITensorMPS.MPS,<:MabsAlg}; 
     kwargs...
 )
     return Base.:(+)(bmps1, bmps2; kwargs...)
 end
 
-"""
-    outer(bmps1::BMPS{<:ITensorMPS.MPS,Truncated}, bmps2::BMPS{<:ITensorMPS.MPS,Truncated}; kwargs...)
-
-Compute outer product of two `BMPS` objects.
-
-Arguments:
-- bmps1::BMPS: First bosonic MPS
-- bmps2::BMPS: Second bosonic MPS
-
-Keyword Arguments:
-- kwargs...: Additional parameters passed to `ITensorMPS.outer`
-
-Returns:
-- BMPO: Outer product result as a bosonic MPO
-"""
 function ITensorMPS.outer(
-    bmps1::BMPS{<:ITensorMPS.MPS,Truncated}, 
-    bmps2::BMPS{<:ITensorMPS.MPS,Truncated}; 
+    bmps1::BMPS{<:ITensorMPS.MPS,<:MabsAlg}, 
+    bmps2::BMPS{<:ITensorMPS.MPS,<:MabsAlg}; 
     kwargs...
 )
+    bmps1.alg == bmps2.alg || throw(ArgumentError(ALGORITHM_MISMATCH_ERROR))
     outer_result = ITensorMPS.outer(bmps1.mps, bmps2.mps; kwargs...)
     return BMPO(outer_result, bmps1.alg)
 end
 
-"""
-    dot(bmps1::BMPS{<:ITensorMPS.MPS,Truncated}, bmps2::BMPS{<:ITensorMPS.MPS,Truncated}; kwargs...)
-
-Compute dot product of two `BMPS` objects.
-
-Arguments:
-- bmps1::BMPS: First bosonic MPS
-- bmps2::BMPS: Second bosonic MPS
-
-Keyword Arguments:
-- kwargs...: Additional parameters passed to LinearAlgebra.dot
-
-Returns:
-- Scalar: Dot product ⟨bmps1|bmps2⟩
-"""
 function LinearAlgebra.dot(
-    bmps1::BMPS{<:ITensorMPS.MPS,Truncated}, 
-    bmps2::BMPS{<:ITensorMPS.MPS,Truncated}; 
+    bmps1::BMPS{<:ITensorMPS.MPS,<:MabsAlg}, 
+    bmps2::BMPS{<:ITensorMPS.MPS,<:MabsAlg}; 
     kwargs...
 )
+    bmps1.alg == bmps2.alg || throw(ArgumentError(ALGORITHM_MISMATCH_ERROR))
     return LinearAlgebra.dot(bmps1.mps, bmps2.mps; kwargs...)
 end
 
-"""
-    inner(bmps1::BMPS{<:ITensorMPS.MPS,Truncated}, bmps2::BMPS{<:ITensorMPS.MPS,Truncated}; kwargs...)
-
-Compute inner product of two `BMPS` objects.
-
-Arguments:
-- bmps1::BMPS: First bosonic MPS
-- bmps2::BMPS: Second bosonic MPS
-
-Keyword Arguments:
-- kwargs...: Additional parameters passed to `ITensorMPS.inner`
-
-Returns:
-- Scalar: Inner product ⟨bmps1|bmps2⟩
-"""
 function ITensorMPS.inner(
-    bmps1::BMPS{<:ITensorMPS.MPS,Truncated}, 
-    bmps2::BMPS{<:ITensorMPS.MPS,Truncated}; 
+    bmps1::BMPS{<:ITensorMPS.MPS,<:MabsAlg}, 
+    bmps2::BMPS{<:ITensorMPS.MPS,<:MabsAlg}; 
     kwargs...
 )
+    bmps1.alg == bmps2.alg || throw(ArgumentError(ALGORITHM_MISMATCH_ERROR))
     return ITensorMPS.inner(bmps1.mps, bmps2.mps; kwargs...)
+end
+
+"""
+    BMPS(mps::ITensorMPS.MPS, alg::PseudoSite)
+
+Create BMPS from existing MPS using PseudoSite algorithm.
+"""
+function BMPS(mps::ITensorMPS.MPS, alg::PseudoSite)
+    n_expected = alg.n_modes * _nqubits_per_mode(mps, alg)
+    length(mps) == n_expected || 
+        throw(ArgumentError("MPS length $(length(mps)) doesn't match expected $n_expected"))
+    
+    return BMPS{typeof(mps), typeof(alg)}(mps, alg)
+end
+
+"""
+    BMPS(sites::Vector{<:ITensors.Index}, states::Vector, alg::PseudoSite)
+
+Create a bosonic matrix product state in the pseudo-site representation.
+
+Arguments:
+- sites::Vector{ITensors.Index}: Qubit site indices
+- states::Vector: Bosonic occupation numbers for each mode
+- alg::PseudoSite: Algorithm specification
+
+Returns:
+- BMPS: Product state in the pseudo-site representation
+"""
+function BMPS(sites::Vector{<:ITensors.Index}, states::Vector, alg::PseudoSite)
+    nqubits = _nqubits_per_mode(sites, alg)
+    n_expected = alg.nmodes * nqubits
+    length(sites) == n_expected || 
+        throw(ArgumentError("Sites length $(length(sites)) must match expected $n_expected"))
+    length(states) == alg.nmodes || 
+        throw(ArgumentError("Number of states $(length(states)) must match modes $(alg.nmodes))"))
+    qubit_states = Vector{Int}(undef, n_expected) 
+    idx = 1
+    @inbounds for (mode_idx, n) in enumerate(states)
+        n <= 2^nqubits - 1 || 
+            throw(ArgumentError("State $n exceeds maximum $(2^nqubits - 1)"))
+        qubit_state = Mabs._fock_to_qubit(n, nqubits)
+        copyto!(qubit_states, idx, qubit_state, 1, nqubits)
+        idx += nqubits
+    end
+    mps = ITensorMPS.productMPS(sites, qubit_states)
+    return BMPS{typeof(mps), typeof(alg)}(mps, alg)
 end
