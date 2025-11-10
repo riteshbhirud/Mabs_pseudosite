@@ -63,13 +63,16 @@ function _matrix_to_cluster_operator(
     @assert size(matrix, 2) == dim "Matrix must be square"
     @assert dim == 2^nqubits "Matrix dimension must match qubit space: $dim ≠ $(2^nqubits)"
     op = ITensors.ITensor(ComplexF64, cluster_sites'..., cluster_sites...)
+    qubit_m_buffer = Vector{Int}(undef, nqubits)  
+    qubit_n_buffer = Vector{Int}(undef, nqubits) 
+    
     @inbounds for m in 0:(dim-1)
-        qubit_m = _fock_to_qubit(m, nqubits)
+        _fock_to_qubit!(qubit_m_buffer, m, nqubits)  
         @inbounds for n in 0:(dim-1)
             element = matrix[m+1, n+1]
-            if abs(element) > 1e-15  
-                qubit_n = _fock_to_qubit(n, nqubits)
-                set_cluster_matrix_element!(op, cluster_sites, qubit_m, qubit_n, element)
+            if abs(element) > 1e-15
+                _fock_to_qubit!(qubit_n_buffer, n, nqubits)  
+                set_cluster_matrix_element!(op, cluster_sites, qubit_m_buffer, qubit_n_buffer, element)
             end
         end
     end
@@ -295,123 +298,3 @@ end
 Build hopping MPO for adjacent modes using direct construction.
 Handles â†ᵢ âᵢ₊₁ term.
 """
-function _hopping_mpo(
-    sites::Vector{<:ITensors.Index},
-    alg::PseudoSite,
-    mode_i::Int,
-    coeff::Number
-)
-    nqubits = _nqubits_per_mode(alg)
-    max_occ = 2^nqubits - 1
-    
-    mode_j = mode_i + 1
-    if mode_j > alg.n_modes
-        error("Mode index out of range")
-    end
-    start_i = (mode_i - 1) * nqubits + 1
-    end_i = mode_i * nqubits
-    start_j = (mode_j - 1) * nqubits + 1
-    end_j = mode_j * nqubits
-    n_total = length(sites)
-    
-    terms = ITensorMPS.MPO[]
-    @inbounds for ni in 0:max_occ, nj in 0:max_occ
-        if ni >= max_occ  
-            continue
-        end
-        if nj == 0  
-            continue
-        end
-        mat_elem = sqrt(ni + 1) * sqrt(nj) * coeff
-        if abs(mat_elem) < 1e-15
-            continue
-        end
-        bra_states_i = _fock_to_qubit(ni, nqubits)
-        bra_states_j = _fock_to_qubit(nj, nqubits)
-        ket_states_i = _fock_to_qubit(ni + 1, nqubits)
-        ket_states_j = _fock_to_qubit(nj - 1, nqubits)
-        mpo_tensors = Vector{ITensors.ITensor}(undef, n_total)
-        @inbounds for site_idx in 1:n_total
-            s = sites[site_idx]
-            if start_i <= site_idx <= end_i
-                local_idx = site_idx - start_i + 1
-                ket_val = ket_states_i[local_idx]
-                bra_val = bra_states_i[local_idx]
-                mpo_tensors[site_idx] = ITensors.ITensor(ComplexF64, s', s)
-                mpo_tensors[site_idx][s' => bra_val, s => ket_val] = mat_elem
-                
-            elseif start_j <= site_idx <= end_j
-                local_idx = site_idx - start_j + 1
-                ket_val = ket_states_j[local_idx]
-                bra_val = bra_states_j[local_idx]
-                mpo_tensors[site_idx] = ITensors.ITensor(ComplexF64, s', s)
-                mpo_tensors[site_idx][s' => bra_val, s => ket_val] = 1.0
-                
-            else
-                mpo_tensors[site_idx] = ITensors.ITensor(ComplexF64, s', s)
-                mpo_tensors[site_idx][s' => 1, s => 1] = 1.0
-                mpo_tensors[site_idx][s' => 2, s => 2] = 1.0
-            end
-        end
-        term_mpo = ITensorMPS.MPO(mpo_tensors)
-        push!(terms, term_mpo)
-    end
-    @inbounds for ni in 0:max_occ, nj in 0:max_occ
-        if ni == 0  
-            continue
-        end
-        if nj >= max_occ 
-            continue
-        end
-        mat_elem = sqrt(ni) * sqrt(nj + 1) * coeff
-        
-        if abs(mat_elem) < 1e-15
-            continue
-        end
-        bra_states_i = _fock_to_qubit(ni, nqubits)
-        bra_states_j = _fock_to_qubit(nj, nqubits)
-        ket_states_i = _fock_to_qubit(ni - 1, nqubits)
-        ket_states_j = _fock_to_qubit(nj + 1, nqubits)
-        mpo_tensors = Vector{ITensors.ITensor}(undef, n_total)
-        @inbounds for site_idx in 1:n_total
-            s = sites[site_idx]
-            if start_i <= site_idx <= end_i
-                local_idx = site_idx - start_i + 1
-                ket_val = ket_states_i[local_idx]
-                bra_val = bra_states_i[local_idx]
-                mpo_tensors[site_idx] = ITensors.ITensor(ComplexF64, s', s)
-                mpo_tensors[site_idx][s' => bra_val, s => ket_val] = mat_elem
-                
-            elseif start_j <= site_idx <= end_j
-                local_idx = site_idx - start_j + 1
-                ket_val = ket_states_j[local_idx]
-                bra_val = bra_states_j[local_idx]
-                mpo_tensors[site_idx] = ITensors.ITensor(ComplexF64, s', s)
-                mpo_tensors[site_idx][s' => bra_val, s => ket_val] = 1.0
-            else
-                mpo_tensors[site_idx] = ITensors.ITensor(ComplexF64, s', s)
-                mpo_tensors[site_idx][s' => 1, s => 1] = 1.0
-                mpo_tensors[site_idx][s' => 2, s => 2] = 1.0
-            end
-        end
-        term_mpo = ITensorMPS.MPO(mpo_tensors)
-        push!(terms, term_mpo)
-    end
-    
-    if isempty(terms)
-        mpo_tensors = Vector{ITensors.ITensor}(undef, n_total)
-        @inbounds for site_idx in 1:n_total
-            s = sites[site_idx]
-            mpo_tensors[site_idx] = ITensors.ITensor(ComplexF64, s', s)
-            mpo_tensors[site_idx][s' => 1, s => 1] = 0.0
-            mpo_tensors[site_idx][s' => 2, s => 2] = 0.0
-        end
-        return ITensorMPS.MPO(mpo_tensors)
-    end
-    
-    result = terms[1]
-    @inbounds for i in 2:length(terms)
-        result = ITensorMPS.add(result, terms[i]; cutoff=1e-15)
-    end
-    return result
-end

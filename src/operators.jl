@@ -332,15 +332,21 @@ function kerr(
 end
 
 """
-    harmonic_chain(sites::Vector{<:ITensors.Index}, alg::PseudoSite; ω::Real=1.0, J::Real=0.0)
+    harmonic_chain(sites::Vector{<:ITensors.Index}, alg::PseudoSite; ω::Real=1.0, J::Real=0.0, kwargs...)
 
 Build harmonic chain Hamiltonian in the pseudo-site representation.
 H = Σᵢ ω*nᵢ + J*Σᵢ (aᵢ†aᵢ₊₁ + h.c.)
+
+Keyword Arguments
+- ω::Real: Harmonic oscillator frequency 
+- J::Real: Nearest-neighbor hopping strength
+- kwargs...: Additional parameters passed to `ITensorMPS.add` (e.g., `cutoff`, `maxdim`)
 """
-function harmonic_chain(sites::Vector{<:ITensors.Index}, alg::PseudoSite; ω::Real=1.0, J::Real=0.0)
-    nqubits = nqubits_per_mode(sites, alg)
-    n_expected = alg.n_modes * nqubits
+function harmonic_chain(sites::Vector{<:ITensors.Index}, alg::PseudoSite; ω::Real=1.0, J::Real=0.0, kwargs...)
+    nqubits = _nqubits_per_mode(sites, alg)
+    n_expected = alg.nmodes * nqubits
     length(sites) == n_expected || throw(ArgumentError("Sites must match algorithm"))
+    
     opsum = ITensors.OpSum()
     @inbounds for mode in 1:alg.nmodes
         @inbounds for i in 1:nqubits
@@ -353,9 +359,8 @@ function harmonic_chain(sites::Vector{<:ITensors.Index}, alg::PseudoSite; ω::Re
     H = ITensorMPS.MPO(opsum, sites)
     if J != 0.0
         @inbounds for mode in 1:(alg.nmodes - 1)
-            H_hop = hopping_mpo(sites, alg, mode, J)
-            # TODO: we shouldn't be determining the cutoff parameter under the hood
-            H = ITensorMPS.add(H, H_hop; cutoff=1e-15)
+            H_hop = _hopping_mpo(sites, alg, mode, J)
+            H = ITensorMPS.add(H, H_hop; kwargs...)
         end
     end
     return BMPO(H, alg)

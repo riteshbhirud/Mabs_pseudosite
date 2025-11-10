@@ -184,11 +184,13 @@ function BMPS(sites::Vector{<:ITensors.Index}, states::Vector, alg::PseudoSite)
     length(states) == alg.nmodes || 
         throw(ArgumentError("Number of states $(length(states)) must match modes $(alg.nmodes))"))
     qubit_states = Vector{Int}(undef, n_expected) 
+    qubit_state_buffer = Vector{Int}(undef, nqubits)
     idx = 1
+    
     @inbounds for (mode_idx, n) in enumerate(states)
         n <= 2^nqubits - 1 || 
             throw(ArgumentError("State $n exceeds maximum $(2^nqubits - 1)"))
-        qubit_state = Mabs._fock_to_qubit(n, nqubits)
+        _fock_to_qubit!(qubit_state_buffer, n, nqubits)
         copyto!(qubit_states, idx, qubit_state, 1, nqubits)
         idx += nqubits
     end

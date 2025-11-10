@@ -152,26 +152,28 @@ function _mode_indices(sites::Vector{<:ITensors.Index}, alg::PseudoSite, mode::I
 end
 
 """
-    _fock_to_qubit(n::Int, nqubits::Int)
+    _fock_to_qubit!(buffer::Vector{Int}, n::Int, nqubits::Int)
 
-Convert decimal occupation number to binary state vector.
+convert occupation number to binary state vector.
+Writes directly into buffer to avoid allocations.
 
 Arguments:
-- n::Int: Occupation number
+- buffer::Vector{Int}: Pre-allocated buffer (length nqubits)
+- n::Int: Occupation number  
 - nqubits::Int: Number of qubits
 
 Returns:
-- Vector{Int}: Binary representation `[b₀, b₁, ..., bₙ₋₁]` where `bᵢ ∈ {1,2}` (ITensor convention)
+- buffer (modified in-place)
 """
-function _fock_to_qubit(n::Int, nqubits::Int)
+function _fock_to_qubit!(buffer::Vector{Int}, n::Int, nqubits::Int)
     n >= 0 || throw(ArgumentError("Occupation number must be non-negative"))
     n < 2^nqubits || throw(ArgumentError("Occupation $n exceeds max for $nqubits qubits"))
-    binary_state = Vector{Int}(undef, nqubits)
+    
     @inbounds for i in 1:nqubits
-        bit = (n >> (i-1)) & 1  
-        binary_state[i] = bit + 1  
+        bit = (n >> (i-1)) & 1
+        buffer[i] = bit + 1
     end
-    return binary_state
+    return buffer
 end
 
 """
