@@ -1,4 +1,3 @@
-
 # helper function for safe factorial calculation to avoid performance issues.
 function _safe_factorial(n::Int)
     if n <= 20
@@ -332,17 +331,21 @@ function kerr(
 end
 
 """
-    harmonic_chain(sites::Vector{<:ITensors.Index}, alg::PseudoSite; ω::Real=1.0, J::Real=0.0, kwargs...)
+    harmonic_chain(sites::Vector{<:ITensors.Index}, alg::PseudoSite, ω::Real, J::Real; kwargs...)
 
 Build harmonic chain Hamiltonian in the pseudo-site representation.
 H = Σᵢ ω*nᵢ + J*Σᵢ (aᵢ†aᵢ₊₁ + h.c.)
 
-Keyword Arguments
-- ω::Real: Harmonic oscillator frequency 
+Arguments:
+- sites::Vector{<:ITensors.Index}: Qubit site indices
+- alg::PseudoSite: Algorithm specification
+- ω::Real: Harmonic oscillator frequency
 - J::Real: Nearest-neighbor hopping strength
+
+Keyword Arguments:
 - kwargs...: Additional parameters passed to `ITensorMPS.add` (e.g., `cutoff`, `maxdim`)
 """
-function harmonic_chain(sites::Vector{<:ITensors.Index}, alg::PseudoSite; ω::Real=1.0, J::Real=0.0, kwargs...)
+function harmonic_chain(sites::Vector{<:ITensors.Index}, alg::PseudoSite, ω::Real, J::Real; kwargs...)
     nqubits = _nqubits_per_mode(sites, alg)
     n_expected = alg.nmodes * nqubits
     length(sites) == n_expected || throw(ArgumentError("Sites must match algorithm"))
@@ -367,15 +370,22 @@ function harmonic_chain(sites::Vector{<:ITensors.Index}, alg::PseudoSite; ω::Re
 end
 
 """
-    kerr(sites::Vector{<:ITensors.Index}, alg::PseudoSite; ω::Real=1.0, χ::Real=0.1)
+    kerr(sites::Vector{<:ITensors.Index}, alg::PseudoSite, ω::Real, χ::Real)
 
 Build Kerr nonlinearity Hamiltonian in the pseudo-site representation.
 H = Σᵢ (ω*nᵢ + χ*nᵢ²)
+
+Arguments:
+- sites::Vector{<:ITensors.Index}: Qubit site indices
+- alg::PseudoSite: Algorithm specification
+- ω::Real: Linear frequency
+- χ::Real: Kerr nonlinearity strength
 """
-function kerr(sites::Vector{<:ITensors.Index}, alg::PseudoSite; ω::Real=1.0, χ::Real=0.1)
-    nqubits = nqubits_per_mode(sites, alg)
-    n_expected = alg.n_modes * nqubits
+function kerr(sites::Vector{<:ITensors.Index}, alg::PseudoSite, ω::Real, χ::Real)
+    nqubits = _nqubits_per_mode(sites, alg)
+    n_expected = alg.nmodes * nqubits
     length(sites) == n_expected || throw(ArgumentError("Sites must match algorithm"))
+    
     opsum = ITensors.OpSum()
     @inbounds for mode in 1:alg.nmodes
         @inbounds for i in 1:nqubits
