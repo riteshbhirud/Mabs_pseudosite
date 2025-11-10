@@ -283,25 +283,30 @@ end
         sites::Vector{<:ITensors.Index},
         alg::PseudoSite,
         αs::Vector{<:Number};
+        amplitude_threshold::Real=1e-10,
         kwargs...
     )
 
-Displacement operator approach for coherent states.
+Displacement operator approach for coherent states in PseudoSite representation.
 More efficient for large Hilbert spaces.
 
 # Keyword Arguments
+- amplitude_threshold::Real: Minimum amplitude |α| to apply displacement operator. 
+  Displacements with |α| < amplitude_threshold are skipped for efficiency. 
+  Default: 1e-10 (contributes < 1e-20 photons, negligible for all physical applications)
 - kwargs...: Passed to `ITensors.apply` (e.g., `cutoff`, `maxdim`)
 """
 function _coherentstate_via_displacement(
     sites::Vector{<:ITensors.Index},
     alg::PseudoSite,
     αs::Vector{<:Number};
+    amplitude_threshold::Real=1e-10,
     kwargs...
 )
     psi = vacuumstate(sites, alg)
     @inbounds for mode_idx in 1:alg.nmodes
         α = αs[mode_idx]
-        if abs(α) > 1e-10  
+        if abs(α) > amplitude_threshold
             cluster_sites = _mode_cluster(sites, alg, mode_idx)
             D = _displace_qubit(cluster_sites, α)
             psi.mps = ITensors.apply(D, psi.mps; kwargs...)
