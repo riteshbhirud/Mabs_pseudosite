@@ -201,7 +201,8 @@ Arguments:
 Returns:
 - BMPO: Matrix product operator for Kerr chain
 """
-function kerr(sites::Vector{<:ITensors.Index}, alg::Truncated, ω::Real, χ::Real)
+function kerr_hamiltonian(sites::Vector{<:ITensors.Index}, alg::Truncated, ω::Real, χ::Real)
+
     opsum = ITensors.OpSum()
     @inbounds for i in eachindex(sites)
         opsum += ω, "N", i
@@ -494,7 +495,7 @@ function harmonic_chain(sites::Vector{<:ITensors.Index}, alg::PseudoSite, ω::Re
 end
 
 """
-    kerr(sites::Vector{<:ITensors.Index}, alg::PseudoSite, ω::Real, χ::Real)
+    kerr_hamiltonian(sites::Vector{<:ITensors.Index}, alg::PseudoSite, ω::Real, χ::Real)
 
 Build Kerr nonlinearity Hamiltonian in the pseudo-site representation.
 H = Σᵢ (ω*nᵢ + χ*nᵢ²)
@@ -504,8 +505,18 @@ Arguments:
 - alg::PseudoSite: Algorithm specification
 - ω::Real: Linear frequency
 - χ::Real: Kerr nonlinearity strength
+
+Returns:
+- BMPO: Matrix product operator for Kerr Hamiltonian
+
+# Example
+```julia
+alg = PseudoSite(3)
+sites = [Index(2, "Qubit,n=\$i") for i in 1:9]
+H = kerr_hamiltonian(sites, alg, 1.0, 0.1)  # H = Σᵢ(nᵢ + 0.1nᵢ²)
+```
 """
-function kerr(sites::Vector{<:ITensors.Index}, alg::PseudoSite, ω::Real, χ::Real)
+function kerr_hamiltonian(sites::Vector{<:ITensors.Index}, alg::PseudoSite, ω::Real, χ::Real)
     nqubits = _nqubits_per_mode(sites, alg)
     n_expected = alg.nmodes * nqubits
     length(sites) == n_expected || throw(ArgumentError("Sites must match algorithm"))

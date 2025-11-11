@@ -92,7 +92,7 @@ using LinearAlgebra
         @test H_harmonic isa BMPO{<:ITensorMPS.MPO,Truncated}
         @test length(H_harmonic) == N
         
-        H_kerr = kerr(sites, Truncated(), 1.0, 0.05)
+        H_kerr = kerr_hamiltonian(sites, Truncated(), 1.0, 0.05)
         @test H_kerr isa BMPO{<:ITensorMPS.MPO,Truncated}
         @test length(H_kerr) == N
     end

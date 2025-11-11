@@ -47,7 +47,6 @@ for f in [
     :(LinearAlgebra.norm),
     :(ITensorMPS.lognorm),
     :(Base.collect),
-    :(Base.length),
     :(Base.size)
 ]
     @eval ($f)(bmps::BMPS{<:ITensorMPS.MPS,<:MabsAlg}) = ($f)(bmps.mps)

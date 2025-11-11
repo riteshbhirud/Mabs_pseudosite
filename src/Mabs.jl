@@ -11,7 +11,7 @@ export BMPS, BMPO, MabsAlg,
        Truncated, PseudoSite, LocalBasis
 
 #  algorithms  
-export dmrg, tebd, tdvp
+export dmrg, tebd, tdvp,harmonic_chain, kerr_hamiltonian
 
 #  constructors
 export random_bmps, vacuumstate, coherentstate

@@ -72,7 +72,7 @@ for f in [
     :(LinearAlgebra.norm),
     :(ITensorMPS.lognorm),
     :(Base.collect),
-    :(Base.length),
+    
     :(Base.size)
 ]
     @eval ($f)(bmpo::BMPO{<:ITensorMPS.MPO,<:MabsAlg}) = ($f)(bmpo.mpo)
