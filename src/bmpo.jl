@@ -210,12 +210,10 @@ function _qubit_opsum(
     qubit_opsum = ITensors.OpSum()
     nqubits = _nqubits_per_mode(sites, alg)
     
-    # Iterate over each term (which is a Scaled{coeff, Prod{Op}})
     for term in opsum
         coeff = ITensors.coefficient(term)
-        ops_prod = ITensors.argument(term)  # Gets the Prod{Op} part
+        ops_prod = ITensors.argument(term)  
         
-        # Iterate over each Op in the product
         for op in ops_prod
             op_name = ITensors.which_op(op)
             site_idx = ITensors.site(op)

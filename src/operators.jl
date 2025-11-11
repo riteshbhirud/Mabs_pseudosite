@@ -213,7 +213,6 @@ function kerr_hamiltonian(sites::Vector{<:ITensors.Index}, alg::Truncated, ω::R
     return BMPO(mpo, Truncated())
 end
 
-# PseudoSite operators - Mode-indexed interface (recommended)
 """
     create(sites::Vector{<:ITensors.Index}, alg::PseudoSite, mode::Int)
 
@@ -364,7 +363,6 @@ function kerr(
     return _kerr_qubit(cluster_sites, χ, t)
 end
 
-# PseudoSite operators - Cluster-based convenience interface
 """
     create(cluster_sites::Vector{<:ITensors.Index}, alg::PseudoSite)
 
