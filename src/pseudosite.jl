@@ -75,6 +75,8 @@ Get number of qubits per mode in the pseudo-site algorithm.
 """
 _nqubits_per_mode(mps::ITensorMPS.MPS, alg::PseudoSite) = Int(length(mps) / alg.nmodes)
 _nqubits_per_mode(sites::Vector{<:ITensors.Index}, alg::PseudoSite) = Int(length(sites) / alg.nmodes)
+_nqubits_per_mode(mpo::ITensorMPS.MPO, alg::PseudoSite) = Int(length(mpo) / alg.nmodes)
+
 
 #=
 """

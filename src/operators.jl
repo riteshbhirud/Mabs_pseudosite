@@ -471,6 +471,8 @@ Keyword Arguments:
 - kwargs...: Additional parameters passed to `ITensorMPS.add` (e.g., `cutoff`, `maxdim`)
 """
 function harmonic_chain(sites::Vector{<:ITensors.Index}, alg::PseudoSite, ω::Real, J::Real; kwargs...)
+    length(sites) % alg.nmodes == 0 || 
+        throw(ArgumentError("Sites length $(length(sites)) must be divisible by nmodes $(alg.nmodes)"))
     nqubits = _nqubits_per_mode(sites, alg)
     n_expected = alg.nmodes * nqubits
     length(sites) == n_expected || throw(ArgumentError("Sites must match algorithm"))
@@ -517,6 +519,8 @@ H = kerr_hamiltonian(sites, alg, 1.0, 0.1)  # H = Σᵢ(nᵢ + 0.1nᵢ²)
 ```
 """
 function kerr_hamiltonian(sites::Vector{<:ITensors.Index}, alg::PseudoSite, ω::Real, χ::Real)
+    length(sites) % alg.nmodes == 0 || 
+        throw(ArgumentError("Sites length $(length(sites)) must be divisible by nmodes $(alg.nmodes)"))
     nqubits = _nqubits_per_mode(sites, alg)
     n_expected = alg.nmodes * nqubits
     length(sites) == n_expected || throw(ArgumentError("Sites must match algorithm"))

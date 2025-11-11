@@ -171,6 +171,8 @@ end
 Create BMPO from existing MPO using the pseudo-site algorithm.
 """
 function BMPO(mpo::ITensorMPS.MPO, alg::PseudoSite)
+    length(mpo) % alg.nmodes == 0 || 
+        throw(ArgumentError("MPO length $(length(mpo)) must be divisible by nmodes $(alg.nmodes)"))
     n_expected = alg.nmodes * _nqubits_per_mode(mpo, alg)
     length(mpo) == n_expected || 
         throw(ArgumentError("MPO length $(length(mpo)) doesn't match expected $n_expected"))
@@ -188,7 +190,7 @@ Multi-site operators (Adag, A) are not yet supported via OpSum.
 Use explicit operator construction instead.
 """
 function BMPO(opsum::ITensors.OpSum, sites::Vector{<:ITensors.Index}, alg::PseudoSite)
-    n_expected = alg.n_modes * _nqubits_per_mode(alg)
+    n_expected = alg.nmodes * _nqubits_per_mode(sites, alg)
     length(sites) == n_expected || 
         throw(ArgumentError("Sites length $(length(sites)) must match expected $n_expected"))
     qubit_opsum = _qubit_opsum(opsum, sites, alg)
@@ -206,13 +208,18 @@ function _qubit_opsum(
     opsum::ITensors.OpSum, sites::Vector{<:ITensors.Index}, alg::PseudoSite
 )
     qubit_opsum = ITensors.OpSum()
-    opsum_terms = opsum.data
     nqubits = _nqubits_per_mode(sites, alg)
-    @inbounds for term in opsum_terms
-        coeff = term.coef
-        ops = term.ops
-        sites_in_term = term.sites
-        @inbounds for (op_name, site_idx) in zip(ops, sites_in_term)
+    
+    # Iterate over each term (which is a Scaled{coeff, Prod{Op}})
+    for term in opsum
+        coeff = ITensors.coefficient(term)
+        ops_prod = ITensors.argument(term)  # Gets the Prod{Op} part
+        
+        # Iterate over each Op in the product
+        for op in ops_prod
+            op_name = ITensors.which_op(op)
+            site_idx = ITensors.site(op)
+            
             if op_name == "N"
                 @inbounds for i in 1:nqubits
                     weight = coeff * 2^(i-1)

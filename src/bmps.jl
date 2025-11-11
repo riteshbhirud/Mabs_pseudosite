@@ -155,7 +155,9 @@ end
 Create BMPS from existing MPS using PseudoSite algorithm.
 """
 function BMPS(mps::ITensorMPS.MPS, alg::PseudoSite)
-    n_expected = alg.n_modes * _nqubits_per_mode(mps, alg)
+    length(mps) % alg.nmodes == 0 || 
+        throw(ArgumentError("MPS length $(length(mps)) must be divisible by nmodes $(alg.nmodes)"))
+    n_expected = alg.nmodes * _nqubits_per_mode(mps, alg)
     length(mps) == n_expected || 
         throw(ArgumentError("MPS length $(length(mps)) doesn't match expected $n_expected"))
     
@@ -190,7 +192,7 @@ function BMPS(sites::Vector{<:ITensors.Index}, states::Vector, alg::PseudoSite)
         n <= 2^nqubits - 1 || 
             throw(ArgumentError("State $n exceeds maximum $(2^nqubits - 1)"))
         _fock_to_qubit!(qubit_state_buffer, n, nqubits)
-        copyto!(qubit_states, idx, qubit_state, 1, nqubits)
+        copyto!(qubit_states, idx, qubit_state_buffer, 1, nqubits)
         idx += nqubits
     end
     mps = ITensorMPS.productMPS(sites, qubit_states)
