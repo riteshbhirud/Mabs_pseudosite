@@ -1021,7 +1021,7 @@ using LinearAlgebra
         end
     end
 
-    @testset "Comprehensive Operator Matrix Construction" begin
+    @testset "Operator Matrix Construction" begin
         alg = PseudoSite(1)
         sites = [ITensors.Index(2, "Qubit,n=$i") for i in 1:3]
         
@@ -1132,7 +1132,7 @@ using LinearAlgebra
         end
     end
 
-    @testset "Production-ready Integration Tests" begin
+    @testset "Integration Tests" begin
         @testset "Full quantum circuit simulation" begin
             alg = PseudoSite(2)
             sites = [ITensors.Index(2, "Qubit,n=$i") for i in 1:6]
